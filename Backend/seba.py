@@ -87,19 +87,15 @@ def get_db() -> Generator[Session, None, None]:
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserModel:
     """Decodifica el token, maneja la expiración/invalidez (401) y retorna el usuario."""
-    
     # Excepción estándar 401
     credentials_exception = HTTPException(
         status_code=401,
         detail="Credenciales inválidas (token ausente o expirado)",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
-        # Decodifica el token usando SECRET_KEY y ALGORITHM
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        # Lee la clave estándar "sub" (subject)
         username: str = payload.get("sub") 
         
         if username is None:
@@ -109,14 +105,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         # Si la decodificación falla (token expirado, firma incorrecta, etc.)
         raise credentials_exception
     
-    # Busca el usuario por el nombre de usuario ('sub')
-    user = db.execute(
-        select(UserModel).where(UserModel.name == username)).scalar_one_or_none()
+    user = db.execute(select(UserModel).where(UserModel.name == username)).scalar_one_or_none()
     
     if user is None:
         raise credentials_exception # Usuario no encontrado, 401
         
-    # Puedes añadir la verificación de actividad de la Versión 1 si es necesaria
     if not user.is_active: 
         raise credentials_exception
 
@@ -129,7 +122,6 @@ def require_role(*roles: str):
     Lanza 403 Forbidden si no tiene el rol.
     """
     def _dep(user: UserModel = Depends(get_current_user)) -> UserModel:
-        # user.role es la columna de rol en tu modelo SQLAlchemy
         if user.role not in roles:
             raise HTTPException(status_code=403, detail="Permisos insuficientes")
         return user
