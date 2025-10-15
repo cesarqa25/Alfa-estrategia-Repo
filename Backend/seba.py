@@ -87,7 +87,6 @@ def get_db() -> Generator[Session, None, None]:
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> UserModel:
     """Decodifica el token, maneja la expiración/invalidez (401) y retorna el usuario."""
-    # Excepción estándar 401
     credentials_exception = HTTPException(
         status_code=401,
         detail="Credenciales inválidas (token ausente o expirado)",
@@ -102,10 +101,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             raise credentials_exception
             
     except JWTError:
-        # Si la decodificación falla (token expirado, firma incorrecta, etc.)
         raise credentials_exception
     
-    user = db.execute(select(UserModel).where(UserModel.name == username)).scalar_one_or_none()
+    user = db.execute(select(UserModel).where(UserModel.rut == username)).scalar_one_or_none()
     
     if user is None:
         raise credentials_exception # Usuario no encontrado, 401
@@ -250,7 +248,7 @@ class RoleEnum(str, Enum):
 
 class StrategicPlanCreate(BaseModel):
     dimension: DimensionEnum
-    colegio: str                          # nombre del colegio (v1 simple; luego puedes hacer catálogo)
+    colegio: str                       
     objetivo_estrategico: str
     estrategia: str
     subdimension: Optional[str] = None
@@ -785,11 +783,13 @@ def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     """Endpoint para autenticar al usuario y generar un token JWT."""
-    user = db.execute(select(UserModel).where(UserModel.name == form_data.username)).scalar_one_or_none()
+    rut_normalizado = normalize_rut(form_data.username) 
+    
+    user = db.execute(select(UserModel).where(UserModel.rut == rut_normalizado)).scalar_one_or_none()
     
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
-            status_code=400,
+            status_code=400, 
             detail="Credenciales inválidas",
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -797,7 +797,7 @@ def login_for_access_token(
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     token_payload = {
-        "sub": user.name,
+        "sub": user.rut, 
         "role": user.role
     }
 

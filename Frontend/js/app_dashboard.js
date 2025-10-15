@@ -324,6 +324,9 @@ async function showPlanList(dimensionValue) {
 }
 
 // ====== Vista 2: detalle del objetivo (tabla de acciones) ======
+// <button id="btnFiltros" class="btn btn--secondary">Filtrar / Ordenar</button>
+// colocar arriba de boton volver
+
 async function showObjectiveDetail(dimensionValue, objetivo) {
   const { groups } = await getPlansByDimension(dimensionValue);
   const items = (groups.get(objetivo) || []).slice()
@@ -333,7 +336,6 @@ async function showObjectiveDetail(dimensionValue, objetivo) {
   $view.innerHTML = `
     <section class="card card--full">
       <header class="card__header" style="display:flex;gap:.5rem;align-items:center;">
-        <button id="btnFiltros" class="btn btn--secondary">Filtrar / Ordenar</button>
         <button class="btn btn--ghost" id="btnVolver">← Volver</button>
         <h2 style="margin:0;">${esc(objetivo)}</h2>
       </header>
@@ -650,11 +652,13 @@ async function showObjectiveResources(dimensionValue, objetivo) {
   };
   const txt = (v) => (v && String(v).trim()) ? String(v) : '–';
 
+// <button id="btnFiltros" class="btn btn--secondary">Filtrar / Ordenar</button>
+// colocar arriba de boton volver
+
   $title.textContent = `${tituloDimension(dimensionValue)} — Recursos`;
   $view.innerHTML = `
     <section class="card card--full">
       <header class="card__header" style="display:flex;gap:.5rem;align-items:center;">
-        <button id="btnFiltrosRecursos" class="btn btn--secondary">Filtrar / Ordenar</button>
         <button class="btn btn--ghost" id="btnVolver">← Volver</button>
         <h2 style="margin:0;">Recursos — ${esc(objetivo)}</h2>
       </header>

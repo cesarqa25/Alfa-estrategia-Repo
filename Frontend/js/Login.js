@@ -1,18 +1,26 @@
 
 const form = document.querySelector('form');
-const $username = document.getElementById('username');
+const $rut = document.getElementById('rut');
 const $password = document.getElementById('password');
 const $submit   = document.getElementById('submit');
 const $msg      = document.getElementById('loginMsg');
+const $toggle   = document.getElementById('ShowPassword')
 
 function showMsg(text, cls = 'msg--info') {
   $msg.className = `msg ${cls}`;
   $msg.textContent = text;
 }
 
+if ($toggle) {
+    $toggle.addEventListener('change', () => {
+        const type = $password.getAttribute('type') === 'password' ? 'text' : 'password';
+        $password.setAttribute('type', type);
+    });
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!$username.value.trim() || !$password.value) {
+  if (!$rut.value.trim() || !$password.value) {
     showMsg('Ingresa usuario y contraseña.', 'msg--error');
     return;
   }
@@ -22,7 +30,7 @@ form.addEventListener('submit', async (e) => {
 
   try {
     const formData = new URLSearchParams();
-    formData.append('username', $username.value.trim());
+    formData.append('username', $rut.value.trim());
     formData.append('password', $password.value);
 
     const res = await fetch('http://127.0.0.1:8000/auth/login', {

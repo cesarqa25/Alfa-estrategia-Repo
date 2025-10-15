@@ -24,7 +24,7 @@ body{
 form{
   z-index: 10;
   width: 300px;
-  height: 450px;
+  height: 490px;
   display: flex;
   justify-self: center;
   align-items: center;
@@ -58,7 +58,9 @@ form input[type="text"],[type="password"]{
   background: #DADADA;
   width: 80%;
   padding: 10px;
+  font-size: 1.1em;
 }
+form input::placeholder{font-size: medium;}
 
 form label{
   font-weight: 500;
@@ -75,7 +77,7 @@ form button{
   width: 80%;
   height: 35px;
   position: absolute;
-  bottom: 28px ;
+  bottom: 20px ;
   transition: all .3s ease-in-out;
   text-align: center;
   color: #F6F6F6;
@@ -85,4 +87,35 @@ form button{
 
 form button:hover{
   opacity: .70;
+}
+
+.button-check {
+  width: 80%; 
+  display: flex; 
+  justify-content: flex-start; 
+  align-items: center;
+  margin-top: 10px; 
+  margin-bottom: 5px;
+}
+
+.button-check label {
+    padding: 0 0 0 5px; 
+    position: static;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.button-check input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    cursor: pointer;
+    background: #DADADA;
+}
+
+.msg{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
 }
