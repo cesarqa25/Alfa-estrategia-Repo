@@ -1,4 +1,4 @@
-*{ /* Selector universal */
+*{ 
   padding: 0;
   margin: 0;
   box-sizing: border-box;
@@ -118,4 +118,18 @@ form button:hover{
   justify-content: center;
   align-items: center;
   
+}
+
+/* Oculta el ícono (ojo) predeterminado de 'Mostrar Contraseña' en navegadores basados en Chromium */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+/* Oculta el ícono de llave/ojo de los gestores de contraseñas de Chrome/Edge */
+input[type="password"]::-webkit-contacts-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
 }
