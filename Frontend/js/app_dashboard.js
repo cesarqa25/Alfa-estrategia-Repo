@@ -1237,19 +1237,16 @@ document.getElementById('btnAddIndic')?.addEventListener('click', async () => {
 }
 
 
-// --- View: simple "Reportes" placeholder ------------------------------------
-/** Static placeholder page for future reports. */
-function showReportes() {
-  $title.textContent = 'Reportes';
-  $view.innerHTML = `
-    <section class="card card--full">
-      <header class="card__header"><h2 style="margin:0;">Reportes</h2></header>
-      <div class="card__body" style="padding: 50px; text-align: center;">
-        <h1 style="color: var(--primary); font-size: 2.5rem;">En proceso...</h1>
-        <p style="margin-top: 15px; font-size: 1.2rem;">Pronto podrás acceder a los informes de gestión.</p>
-      </div>
-    </section>
-  `;
+// --- View: carga dinamica de "Reportes" ------------------------------------
+async function showReportes() {
+  await loadScriptOnce('js/report.js');
+  
+  if (window.showReportesView) {
+    window.showReportesView($view, $title, esc);
+  } else {
+    $title.textContent = 'Error';
+    $view.innerHTML = '<section class="card card--full"><div class="card__body"><p>Error al cargar la vista de reportes.</p></div></section>';
+  }
 }
 
 
