@@ -73,9 +73,22 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 
 
 # ------- Database URL (MySQL) --------
-DATABASE_URL = "mysql+pymysql://root:2025@127.0.0.1:3306/colegio_db"
+DATABASE_URL = (
+    "mysql+pymysql://app_alpha_dev:"
+    "Alpha%402025.DevHub%21"
+    "@dev-db-alpha.unabdevhub.cl:3306/alpha_dev"
+)
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    future=True,
+    connect_args={
+        "ssl": {}
+    },
+)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
 

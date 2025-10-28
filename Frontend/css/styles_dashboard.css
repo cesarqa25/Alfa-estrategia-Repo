@@ -44,7 +44,7 @@ body {
   justify-content: flex-start; 
   align-items: center;    
   padding: 0 20px;      
-  overflow: hidden;
+  overflow: hidden; 
 }
 
 .logos-wrapper {
@@ -410,6 +410,15 @@ content: '▾';
 .btn:active{cursor:progress;}
 .btn--sm, .btn{cursor: pointer;}
 .btn:hover{opacity: .7;}
+
+.btnEliminar{
+  border-style: none;
+  background: #e2e3e4;
+  border-radius: 10px;
+}
+.btnEliminar:hover{
+  cursor: pointer;
+}
 
 /* Campos más altos y con tipografía más grande */
 .smart-form .field > input,

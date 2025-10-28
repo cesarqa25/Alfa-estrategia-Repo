@@ -8,23 +8,41 @@
     <link rel="icon" href="./Imagenes/logo-chico.png">
 </head>
 <body>
-    <img src="./Imagenes/pantalla_completa_1980x1080px/PANTALLA COMPLETA_-04.png" alt="plantilla">
-    <form>
-        <img src="https://colegiosarzobispado.cl/wp-content/uploads/2025/07/logo-texto.png" alt="Logo Colegio Arzobispado" title="Logo Colegio Arzobispado">
-        <h2>Iniciar Sesion</h2>
-        <label for="text">RUT</label>
-        <input type="text" id="rut" placeholder="Ej: 12345678-k" required>
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" placeholder="Ingrese su contraseña" required>
-        <div class="button-check">
-            <input type="checkbox" id="ShowPassword">
-            <label for="ShowPassword" class="label-check">Mostrar Contraseña</label>
-        </div>
-        <p id="loginMsg" class="msg" role="alert" aria-live="polite"></p>
-       
-        <button type="submit" id="submit">Ingresar</button>
+    <div class="contenedor">
+        <form action="submit">
+            
+            <div class="top">
+                <img src="https://colegiosarzobispado.cl/wp-content/uploads/2025/07/logo-texto.png" alt="Logo Colegio Arzobispado" title="Logo Colegio Arzobispado">
+                <h1>Iniciar Sesion</h1>
+            </div>
+
+            <div class="input-box">
+                <input type="text" placeholder="RUT" id="rut" required>
+                <img class="icon" src="../Frontend/Imagenes/ICONOS/extra/user.png"> 
+            </div>
+
+            <div class="input-box2">
+                <input type="password" placeholder="Contraseña" required id="password">
+                <img class="icon" src="../Frontend/Imagenes/ICONOS/extra/lock.png">  
+            </div>
+
+            <div class="button-check">
+                <input type="checkbox" id="ShowPassword">
+                <label for="ShowPassword" class="label-check">Mostrar Contraseña</label>
+            </div>
+            
+            <div id="loginStatus" class="login-status" role="status" aria-live="polite">
+                <div id="progressBar" class="progress-bar"></div>
+                <div id="statusIcon" class="status-icon"></div>
+            </div>
+
+            <p id="loginMsg" class="msg" role="alert" aria-live="polite"></p>
         
-    </form>
+            <button type="submit" id="submit">Ingresar</button>
+
+        </form>
+
+    </div>
     <script src="./js/Login.js"></script>
 </body>
 </html>

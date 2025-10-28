@@ -41,6 +41,62 @@ function navigateToIndicators(goalId) {
 }
 window.navigateToIndicators = navigateToIndicators;
 
+/**
+ * Muestra un diálogo de confirmación personalizado.
+ * Utiliza estilos básicos inline para asegurar que se muestre como un overlay.
+ * @param {string} message - El mensaje a mostrar.
+ * @returns {Promise<boolean>} Resuelve a true si el usuario confirma, false si cancela.
+ */
+function showConfirmationDialog(message) {
+  return new Promise(resolve => {
+    // Crear el fondo (overlay)
+    const overlay = document.createElement('div');
+    // Estilos inline básicos: full-screen, semi-transparente, centrado
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 9999; display: flex; justify-content: center; align-items: center;';
+    
+    // Crear el contenedor del modal
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; padding: 30px; border-radius: 12px; max-width: 380px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.5);';
+
+    // Agregar el mensaje
+    const msg = document.createElement('p');
+    msg.textContent = message;
+    msg.style.cssText = 'font-size: 1.1em; font-weight: 500; color: #333; margin-bottom: 25px;';
+    modal.appendChild(msg);
+
+    // Contenedor de botones
+    const btnContainer = document.createElement('div');
+    btnContainer.style.cssText = 'display: flex; justify-content: space-between; gap: 15px;';
+
+    // Botón Denegar (Rechazar / Cancelar)
+    const btnDeny = document.createElement('button');
+    btnDeny.className = 'btn btn--ghost';
+    btnDeny.textContent = 'Denegar';
+    btnDeny.style.cssText = 'flex-grow: 1;';
+    btnDeny.onclick = () => {
+      document.body.removeChild(overlay);
+      resolve(false);
+    };
+
+    // Botón Aceptar (Confirmar)
+    const btnAccept = document.createElement('button');
+    btnAccept.className = 'btn btn--danger'; // Usamos una clase para indicar acción peligrosa
+    btnAccept.textContent = 'Aceptar';
+    btnAccept.style.cssText = 'flex-grow: 1;';
+    btnAccept.onclick = () => {
+      document.body.removeChild(overlay);
+      resolve(true);
+    };
+
+    btnContainer.appendChild(btnDeny);
+    btnContainer.appendChild(btnAccept);
+    modal.appendChild(btnContainer);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  });
+}
+
 
 // --- Static/demo data used by dashboard tiles -------------------------------
 const data = {
@@ -465,6 +521,12 @@ async function showPlanList(dimensionValue) {
       <li class="obj-item">
         <div class="obj-item__title">
           <span class="obj-item__num">${i++}.</span> ${esc(objetivo)}
+          ${isEditor() ? `
+            <button class="btnEliminar" data-act="del-plan" data-obj="${oEnc}" title="Eliminar Plan">
+            <img src="https://images.icon-icons.com/3355/PNG/512/ui_essential_bin_trash_web_rubbish_icon_210532.png" alt="Icono de tacho de basura"
+            style="width: 20px; height: 20px; vertical-align: middle; filter: invert(30%);">
+            </button>
+          ` : ''}
         </div>
         <div class="obj-item__actions">
           <button class="btn btn--sm" data-act="ver" data-obj="${oEnc}">Ir al objetivo</button>
@@ -478,10 +540,57 @@ async function showPlanList(dimensionValue) {
   html += `</ol>`;
   $list.innerHTML = html;
 
-  $list.addEventListener('click', (ev) => {
+$list.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-act]');
     if (!btn) return;
     const objetivo = decodeURIComponent(btn.dataset.obj || '');
+
+    if (btn.dataset.act === 'del-plan') {
+      const confirmed = await showConfirmationDialog(`¿Estás seguro de querer eliminar todos los planes asociados al objetivo: "${objetivo}"?`);
+
+      if (confirmed) {
+        console.log(`[ACCIÓN] Iniciando eliminación de planes para el objetivo: ${objetivo}`);
+        
+        // Obtener la lista de planes específicos a eliminar
+        const { groups } = await getPlansByDimension(dimensionValue);
+        const planesAEliminar = groups.get(objetivo) || [];
+        
+        if (planesAEliminar.length === 0) {
+            alert(`No se encontraron planes activos para el objetivo "${objetivo}".`);
+            return;
+        }
+
+        let errores = 0;
+        
+        // Realizar llamado DELETE individual por cada ID
+        for (const plan of planesAEliminar) {
+            const planId = plan.id; // Asume que el modelo Plan tiene un campo 'id'
+            const url = `${API}/plans/${planId}`;
+            
+            const res = await fetch(url, { 
+              method: 'DELETE', 
+              headers: { ...authHeaders() } 
+            });
+
+            if (!res.ok) {
+              console.error(`Error al eliminar el plan ID ${planId}. Estado: ${res.status}`);
+              errores++;
+            }
+        }
+        
+        // Mostrar resultado y refrescar
+        if (errores === 0) {
+          alert(`¡Éxito! ${planesAEliminar.length} planes asociados al objetivo "${objetivo}" eliminados.`);
+        } else {
+          alert(`Atención: Se eliminaron ${planesAEliminar.length - errores} de ${planesAEliminar.length} planes. Hubo ${errores} errores.`);
+        }
+        
+        window.invalidatePlansCache(dimensionValue);
+        showPlanList(dimensionValue);
+      }
+      return;
+    }
+
     if (btn.dataset.act === 'ver') showObjectiveDetail(dimensionValue, objetivo);
     if (btn.dataset.act === 'rec') showObjectiveResources(dimensionValue, objetivo);
     if (btn.dataset.act === 'evi') showEvidenceUpload(dimensionValue, objetivo);
@@ -495,7 +604,6 @@ document.getElementById('btnRefrescar')?.addEventListener('click', () => {
     showPlanList(dimensionValue);
   });
 }
-
 
 // --- Views: detalle de objetivo ---------------------------------------------
 async function showObjectiveDetail(dimensionValue, objetivo) {
@@ -538,7 +646,6 @@ const { groups } = await getPlansByDimension(dimensionValue);
       return direction === 'asc' ? cmp : -cmp;
     });
 
-    // Generar las filas de la tabla
     const rowsHtml = sortedItems.map(r => `
       <tr>
         <td>${esc(r.colegio)}</td>
@@ -996,7 +1103,7 @@ async function showIndicatorsForGoal(goalId) {
           <td>${esc(x.unit || '—')}</td>
           <td>${x.target == null ? '—' : esc(x.target)}</td>
           <td>
-            <button class="btn btn--sm" data-act="prog">Progreso</button>
+            <button class="btn btn--sm" data-act="prog" style="margin=5px 0;">Progreso</button>
             <button class="btn btn--sm btn--ghost" data-act="del">Eliminar</button>
           </td>
         </tr>

@@ -1,14 +1,41 @@
-
 const form = document.querySelector('form');
 const $rut = document.getElementById('rut');
 const $password = document.getElementById('password');
 const $submit   = document.getElementById('submit');
 const $msg      = document.getElementById('loginMsg');
 const $toggle   = document.getElementById('ShowPassword')
+const $statusBar = document.getElementById('progressBar');
+const $statusIcon = document.getElementById('statusIcon');
 
-function showMsg(text, cls = 'msg--info') {
-  $msg.className = `msg ${cls}`;
-  $msg.textContent = text;
+/**
+ * @param {('loading'|'success'|'error'|'initial')} state
+ * @param {string} iconText 
+ */
+
+function updateStatus(state, iconText = '') {
+    $statusBar.className = 'progress-bar';
+    $statusIcon.className = 'status-icon';
+    $statusIcon.textContent = iconText;
+    $statusIcon.style.opacity = '0';
+    $statusBar.style.width = '0%';
+
+    switch (state) {
+        case 'loading':
+            $statusBar.classList.add('progress-bar--loading');
+            break;
+        case 'success':
+            $statusBar.classList.add('progress-bar--success');
+            $statusIcon.classList.add('status-icon--success');
+            setTimeout(() => { $statusIcon.style.opacity = '1'; }, 700); 
+            break;
+        case 'error':
+            $statusBar.classList.add('progress-bar--error');
+            $statusIcon.classList.add('status-icon--error');
+            setTimeout(() => { $statusIcon.style.opacity = '1'; }, 700); 
+        case 'initial':
+        default:
+            break;
+    }
 }
 
 if ($toggle) {
@@ -18,6 +45,9 @@ if ($toggle) {
     });
 }
 
+$rut.addEventListener('input', () => updateStatus('initial'));
+$password.addEventListener('input', () => updateStatus('initial'));
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!$rut.value.trim() || !$password.value) {
@@ -26,7 +56,7 @@ form.addEventListener('submit', async (e) => {
   }
 
   $submit.disabled = true;
-  showMsg('Validando credenciales...', 'msg--info');
+  updateStatus('loading');
 
   try {
     const formData = new URLSearchParams();
@@ -40,28 +70,18 @@ form.addEventListener('submit', async (e) => {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      let errorMessage = 'Credenciales inválidas. Verifica tu usuario y contraseña.';
-      
-      if (err.detail) {
-        if (Array.isArray(err.detail) && err.detail.length > 0) {
-          errorMessage = err.detail[0].msg;
-        } else if (typeof err.detail === 'string') {
-          errorMessage = err.detail;
-        }
-      }
+      updateStatus('error', 'X')
 
-      showMsg(errorMessage, 'msg--error');
       return;
     }
 
     const data = await res.json();
     localStorage.setItem('token', data.access_token);
-    showMsg('¡Ingreso exitoso! Redirigiendo...', 'msg--ok');
-    setTimeout(() => { window.location.href = 'dashboard.html'; }, 700);
+    updateStatus('success', '✓');
+    setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
   } catch (err) {
-    showMsg('Error de conexión con el servidor.', 'msg--error');
+      updateStatus('error', 'X');
   } finally {
-    $submit.disabled = false;
+      setTimeout(() => { $submit.disabled = false; }, 1200);
   }
 });
