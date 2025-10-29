@@ -624,3 +624,101 @@ textarea.inp{ resize: vertical; min-height: 56px; line-height: 1.35; }
     font-weight: bold;
     color: #333;
 }
+
+
+
+.plan--item::-webkit-details-marker {
+      display: none;
+}
+
+.nav__details>.plan--item::after {
+      content: '▸';
+}
+
+/* Modal + evidencias */
+.modal.hidden {
+      display: none;
+}
+
+.modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+}
+
+.modal__content {
+      background: #fff;
+      width: 820px;
+      max-width: 95vw;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
+}
+
+.modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+}
+
+.modal__close {
+      border: 0;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+}
+
+.evidence-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #eee;
+  margin-top: 6px;
+}
+
+.evidence-list .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+/* Inputs del uploader */
+#plan-select {
+  min-width: 260px;
+  padding: 6px 8px;
+  border: 1px solid #cfd6e4;
+  border-radius: 6px;
+  background: #fff;
+}
+
+#evidence-file {
+  flex: 1 1 240px;
+}
+
+#evidence-desc {
+  flex: 1 1 260px;
+  padding: 6px 8px;
+  border: 1px solid #cfd6e4;
+  border-radius: 6px;
+}
+
+#evidence-upload-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+}
+
+.hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 4px;
+}

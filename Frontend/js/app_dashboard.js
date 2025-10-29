@@ -762,6 +762,7 @@ const { groups } = await getPlansByDimension(dimensionValue);
     navigateHash(`#/metas/${encodeURIComponent(dimensionValue)}/${encodeURIComponent(objetivo)}`);
   });
 
+
   const $filterBtn = document.getElementById('btnFiltros');
   const $filterArea = document.getElementById('filterArea');
   $filterBtn?.addEventListener('click', () => {
@@ -775,132 +776,182 @@ const { groups } = await getPlansByDimension(dimensionValue);
       sortAndRender(e.target.value);
   });
 
-}
-
-// --- Local evidence storage (IndexedDB) — utilidades (se preservan) ---------
-const DB_NAME = 'evidenciasDB';
-const DB_STORE = 'files';
-function idbOpen() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) {
-        const store = db.createObjectStore(DB_STORE, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('byObjetivo', 'objetivo', { unique: false });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbAdd(fileRec) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).add(fileRec);
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function idbListByObjetivo(objetivo) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readonly');
-    const idx = tx.objectStore(DB_STORE).index('byObjetivo');
-    const req = idx.getAll(IDBKeyRange.only(objetivo));
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function idbDelete(id) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).delete(id);
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-// Optional File System Access integration
-let evidencesDirHandle = null;
-/** Ask the user to pick a local directory for saving evidences. */
-async function chooseLocalFolder() {
-  if (!window.showDirectoryPicker) {
-    alert('Tu navegador no soporta elegir carpeta. Se usará almacenamiento interno (IndexedDB).');
-    return null;
+  let objectiveId = getCachedObjectiveId(dimensionValue, objetivo);
+  if (!objectiveId) {
+    try {
+      const obj = await ensureObjectiveByName(dimensionValue, objetivo);
+      objectiveId = obj?.id || null;
+    } catch (e) { console.error(e); }
   }
-  evidencesDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-  const perm = await evidencesDirHandle.requestPermission({ mode: 'readwrite' });
-  if (perm !== 'granted') evidencesDirHandle = null;
-  return evidencesDirHandle;
-}
 
-/** Save a file into the chosen local directory (if available). */
-async function saveToFolder(file) {
-  if (!evidencesDirHandle) return false;
-  const safeName = file.name.replace(/[/\\?%*:|"<>]/g, '_');
-  const fh = await evidencesDirHandle.getFileHandle(safeName, { create: true });
-  const writable = await fh.createWritable();
-  await writable.write(file);
-  await writable.close();
-  return true;
-}
-
-const ACCEPT_EXT = [
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-  '.png', '.jpg', '.jpeg'
-].join(',');
-
-
-function fileIcon(type, name) {
-  const n = (name || '').toLowerCase();
-  if (n.endsWith('.pdf')) return '📄 PDF';
-  if (n.endsWith('.doc') || n.endsWith('.docx')) return '📝 DOC';
-  if (n.endsWith('.xls') || n.endsWith('.xlsx')) return '📊 XLS';
-  if (n.endsWith('.ppt') || n.endsWith('.pptx')) return '📈 PPT';
-  if (type?.startsWith('image/')) return '🖼️ IMG';
-  return '📁 FILE';
 }
 
 
-function fmtSize(bytes) {
-  if (!Number.isFinite(bytes)) return '—';
-  const u = ['B','KB','MB','GB'];
-  let i=0, n=bytes;
-  while (n >= 1024 && i < u.length-1) { n/=1024; i++; }
-  return `${n.toFixed(1)} ${u[i]}`;
+// === Evidencias por PLAN (subdimensión/acción) ===
+async function apiListEvidencesByPlan(planId) {
+  const res = await fetch(`${API}/plans/${planId}/evidences`, { headers: { ...authHeaders() } });
+  if (!res.ok) throw new Error('No se pudo listar evidencias del plan');
+  return res.json();
+}
+async function apiUploadEvidenceByPlan(planId, file, description = "") {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('description', description || "");
+  const res = await fetch(`${API}/plans/${planId}/evidences`, {
+    method: 'POST',
+    body: fd,
+    headers: { ...authHeaders(false) }, // no content-type manual en multipart
+  });
+  if (!res.ok) throw new Error('No se pudo subir evidencia');
+  return res.json();
 }
 
+// Modal reutilizable para evidencias por plan
+(function ensurePlanEvidenceModal() {
+  if (document.getElementById('plan-ev-modal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'plan-ev-modal';
+  modal.style.cssText = 'position:fixed;inset:0;display:none;background:rgba(0,0,0,.4);z-index:9999;';
+  modal.innerHTML = `
+    <div style="max-width:860px;margin:6vh auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #eee">
+        <h3 style="margin:0">Evidencias de la acción</h3>
+        <button id="plan-ev-close" class="btn btn--ghost" title="Cerrar">✕</button>
+      </div>
+      <div id="plan-ev-list" style="max-height:60vh;overflow:auto;padding:12px 16px"></div>
+      <div id="plan-ev-uploader" style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid #eee">
+        <input type="file" id="plan-ev-file" />
+        <textarea id="plan-ev-desc" placeholder="Descripción (opcional)" style="flex:1;min-height:44px;resize:vertical;"></textarea>
+        <button id="plan-ev-upload" class="btn">Subir</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 
+  let CURRENT_PLAN = null;
+  async function refresh() {
+    const list = document.getElementById('plan-ev-list');
+    list.innerHTML = 'Cargando...';
+    try {
+      const data = await apiListEvidencesByPlan(CURRENT_PLAN);
+      if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = '<p>No hay evidencias aún.</p>';
+        return;
+      }
+      list.innerHTML = data.map(ev => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee">
+          <div>
+            <strong>${ev.original_filename || ev.filename}</strong>
+            <div style="font-size:12px;color:#666">${(ev.description || '') + ' · '}${new Date(ev.uploaded_at).toLocaleString('es-CL')}</div>
+          </div>
+          <div>
+            <a class="btn btn--sm" href="${API}${ev.download_url || ('/uploads/' + ev.filename)}">Descargar</a>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      list.innerHTML = `<p style="color:#c00">${e.message}</p>`;
+    }
+  }
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-plan-evidencias]');
+    if (!btn) return;
+    CURRENT_PLAN = btn.getAttribute('data-plan-evidencias');
+    document.getElementById('plan-ev-modal').style.display = 'block';
+    const canEdit = (window.USER_ROLE === 'editor' || window.USER_ROLE === 'admin');
+    document.getElementById('plan-ev-uploader').style.display = canEdit ? 'flex' : 'none';
+    refresh();
+  });
+  document.getElementById('plan-ev-close').addEventListener('click', () => {
+    document.getElementById('plan-ev-modal').style.display = 'none';
+    CURRENT_PLAN = null;
+  });
+  document.getElementById('plan-ev-upload').addEventListener('click', async () => {
+    const f = document.getElementById('plan-ev-file').files[0];
+    const d = document.getElementById('plan-ev-desc').value;
+    if (!f) { alert('Selecciona un archivo'); return; }
+    try {
+      await apiUploadEvidenceByPlan(CURRENT_PLAN, f, d);
+      document.getElementById('plan-ev-file').value = '';
+      document.getElementById('plan-ev-desc').value = '';
+      await refresh();
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+})();
+
+
+// --- View: Evidencias (sube a backend y lista por Objetivo) ----------------
 async function showEvidenceUpload(dimensionValue, objetivo) {
+  //Garantizar Objetivo
+  const objective = await ensureObjectiveByName(dimensionValue, objetivo);
+  const objectiveId = objective.id;
+
+  //Garantizar Meta (año actual) e Indicador “Evidencias”
+  const metas = await apiListGoalsByObjective(objectiveId);
+  let goalId = metas[0]?.id;
+  if (!goalId) {
+    const year = new Date().getUTCFullYear();
+    const nueva = await apiCreateGoal(objectiveId, {
+      title: 'Evidencias del objetivo',
+      description: `Repositorio de evidencias — ${year}`,
+      year
+    });
+    goalId = nueva.id;
+  }
+
+  const indics = await apiListIndicatorsByGoal(goalId);
+  let indicator = indics.find(x => (x.title || '').toLowerCase() === 'evidencias');
+  if (!indicator) {
+    indicator = await apiCreateIndicator(goalId, { title: 'Evidencias', unit: '', target: '' });
+  }
+  const indicatorId = indicator?.id;
+  if (!indicatorId) {
+    alert('No se pudo inicializar el indicador "Evidencias".');
+    return;
+  }
+
+  //obtener planes (acciones) para este objetivo (para permitir vincular evidencias a una acción)
+  const plansByDim = await getPlansByDimension(dimensionValue);
+  const plansForObjective = (plansByDim.groups.get(objetivo) || []).slice();
+
   $title.textContent = `${tituloDimension(dimensionValue)} — Evidencias`;
   $view.innerHTML = `
     <section class="card card--full">
       <header class="card__header" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
         <button class="btn btn--ghost" id="btnBack">← Volver</button>
         <h2 style="margin:0;">Evidencias — ${esc(objetivo)}</h2>
-        <div style="margin-left:auto;display:flex;gap:.5rem;">
-          <button class="btn btn--ghost" id="btnChooseFolder">Elegir carpeta del PC (opcional)</button>
-        </div>
       </header>
+
       <div class="card__body">
         <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
-          <input id="fileInput" type="file" accept="${ACCEPT_EXT}" multiple />
+          <label style="display:flex;gap:.5rem;align-items:center;">
+            <span>Vincular a acción:</span>
+            <select id="selAction" class="inp">
+              <option value="">(No vincular / usar indicador)</option>
+              ${plansForObjective.map(p => `<option value="${p.id}">${esc(p.accion || ('Acción #' + p.id))} — ${esc(p.colegio || '')}</option>`).join('')}
+            </select>
+          </label>
+
+          <input id="fileInput" type="file"
+                 accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx"
+                 multiple />
+          <textarea id="fileDesc" class="inp inp--lg" placeholder="Descripción (opcional)" rows="3" style="min-width:380px;max-width:60vw;"></textarea>
           <button class="btn" id="btnUpload">Subir</button>
-          <small>Formatos permitidos: PDF, DOC(X), XLS(X), PPT(X), PNG/JPG</small>
+          <small>Se guardará en el servidor y quedará visible en “Ir al objetivo → Evidencias”.</small>
         </div>
+
         <hr/>
+
         <div class="table-wrap">
           <table class="plan-table">
             <thead>
               <tr>
                 <th>Archivo</th>
-                <th>Tamaño</th>
-                <th>Tipo</th>
+                <th>Pertenece a</th>
                 <th>Fecha</th>
                 <th>Acciones</th>
+                <th>Descripción</th>
               </tr>
             </thead>
             <tbody id="tbFiles"><tr><td colspan="5">Cargando…</td></tr></tbody>
@@ -910,76 +961,164 @@ async function showEvidenceUpload(dimensionValue, objetivo) {
     </section>
   `;
 
-  document.getElementById('btnBack')?.addEventListener('click', () => showPlanList(dimensionValue));
-  document.getElementById('btnChooseFolder')?.addEventListener('click', async () => {
-    await chooseLocalFolder();
-    alert(evidencesDirHandle ? 'Carpeta lista. Los archivos también se guardarán ahí.' : 'No se pudo usar carpeta; se seguirá usando almacenamiento interno.');
-  });
+  document.getElementById('btnBack').onclick = () => showObjectiveDetail(dimensionValue, objetivo);
 
+  //trae evidencias del indicador y de las acciones del objetivo y las mezcla
   async function refreshList() {
-    const rows = await idbListByObjetivo(objetivo);
     const tb = document.getElementById('tbFiles');
-    if (!rows.length) {
-      tb.innerHTML = `<tr><td colspan="5">Aún no hay evidencias para este objetivo.</td></tr>`;
-      return;
+    tb.innerHTML = `<tr><td colspan="5">Cargando…</td></tr>`;
+    try {
+      // evidencias guardadas en el indicador
+      const resInd = await fetch(`${API}/indicators/${indicatorId}/evidences?limit=500`, { headers: { ...authHeaders() } });
+      const evsInd = resInd.ok ? await resInd.json() : [];
+
+      // evidencias por cada plan/acción del objetivo
+      const planFetches = plansForObjective.map(p =>
+        fetch(`${API}/plans/${p.id}/evidences?limit=500`, { headers: { ...authHeaders() } })
+          .then(r => r.ok ? r.json() : [])
+          .then(list => list.map(e => ({ ...e, _plan: p })))
+          .catch(() => [])
+      );
+      const planEvsArrays = await Promise.all(planFetches);
+      const evsPlan = planEvsArrays.flat();
+
+      const all = [
+        ...evsInd.map(e => ({ ...e, _kind: 'indicator' })),
+        ...evsPlan.map(e => ({ ...e, _kind: 'plan' }))
+      ].sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+
+      if (!all.length) {
+        tb.innerHTML = `<tr><td colspan="5">Sin evidencias aún.</td></tr>`;
+        return;
+      }
+
+      // construir filas con control de ancho y wrapping en la celda de descripción
+      tb.innerHTML = all.map(ev => {
+        // determinar etiqueta de acción/plan relacionada (puede venir desde _plan o desde campos del backend)
+        const actionLabel = ev._plan?.accion || ev.plan_title || (ev.plan_id ? ('Acción #' + ev.plan_id) : '');
+        // construir bloque de descripción + acción debajo
+        const descHtml = `
+           <div style="white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word; max-width:48vw;">${esc(ev.description || '—')}</div>
+           ${actionLabel ? `<div style="font-size:12px;color:var(--muted-color,#666);margin-top:6px;white-space:normal;">Pertenece a: <strong>${esc(actionLabel)}</strong></div>` : ''}
+         `;
+        return `
+           <tr>
+             <td style="max-width:22vw; white-space:normal; overflow-wrap:break-word;">${esc(ev.original_filename || ev.filename)}</td>
+             <td style="white-space:normal;">${ev._kind === 'plan' ? esc(ev._plan?.accion || ('Acción #' + ev._plan?.id)) : esc(ev.indicator_title || 'Indicador')}</td>
+             <td>${new Date(ev.uploaded_at).toLocaleString('es-CL')}</td>
+             <td>
+              <button class="btn btn--sm" data-act="download-evidence" data-url="${API}${ev.download_url || ('/uploads/' + ev.filename)}" style="margin-right: 8px;">Descargar</button>
+              <button class="btn btn--sm btn--ghost" data-act="delete-evidence" data-id="${ev.id}">Eliminar</button>
+              </td>
+             <td style="max-width:48vw; white-space:normal; vertical-align:top;">${descHtml}</td>
+           </tr>
+         `;
+      }).join('');
+
+    } catch (e) {
+      console.error(e);
+      tb.innerHTML = `<tr><td colspan="5">No se pudo cargar evidencias.</td></tr>`;
     }
-    tb.innerHTML = rows.map(r => {
-      const when = new Date(r.createdAt || Date.now()).toLocaleString('es-CL');
-      return `
-        <tr data-id="${r.id}">
-          <td>${fileIcon(r.type, r.name)} — ${esc(r.name)}</td>
-          <td>${fmtSize(r.size)}</td>
-          <td>${esc(r.type || '—')}</td>
-          <td>${when}</td>
-          <td>
-            <button class="btn btn--sm" data-act="dl">Descargar</button>
-            <button class="btn btn--sm btn--ghost" data-act="del">Eliminar</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
   }
 
-  document.getElementById('btnUpload')?.addEventListener('click', async () => {
+  //Subida (multiarchivo) — si se selecciona una acción sube a /plans/:id/evidences, si no a indicador
+  document.getElementById('btnUpload').addEventListener('click', async () => {
     const inp = document.getElementById('fileInput');
-    if (!inp.files || !inp.files.length) { alert('Selecciona uno o más archivos primero.'); return; }
-    for (const file of inp.files) {
-      try { await saveToFolder(file); } catch(_) {}
-      const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'application/octet-stream' });
-      await idbAdd({ objetivo, dimension: dimensionValue, name: file.name, size: file.size, type: file.type || '', createdAt: Date.now(), blob });
-    }
-    alert('Evidencia(s) guardada(s).');
-    await refreshList();
-    document.getElementById('fileInput').value = '';
-  });
-
-  document.getElementById('tbFiles')?.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const tr = btn.closest('tr[data-id]');
-    const id = Number(tr?.dataset.id);
-
-    if (btn.dataset.act === 'del') {
-      if (confirm('¿Eliminar esta evidencia local?')) {
-        await idbDelete(id);
-        await refreshList();
-      }
+    const desc = (document.getElementById('fileDesc').value || '').trim();
+    const sel = document.getElementById('selAction').value;
+    if (!inp.files || !inp.files.length) {
+      alert('Selecciona uno o más archivos primero.');
       return;
     }
-    if (btn.dataset.act === 'dl') {
-      const rows = await idbListByObjetivo(objetivo);
-      const rec = rows.find(r => r.id === id);
-      if (!rec) return;
-      const url = URL.createObjectURL(rec.blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = rec.name || 'evidencia';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+
+    for (const file of inp.files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (desc) fd.append('description', desc);
+
+      const url = sel ? `${API}/plans/${sel}/evidences` : `${API}/indicators/${indicatorId}/evidences`;
+      console.log('Subiendo archivo:', file.name, '->', url, 'token?', !!localStorage.getItem('token'));
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { ...authHeaders() },
+          body: fd
+        });
+
+        const text = await resp.text().catch(() => '');
+        console.log('Respuesta servidor:', resp.status, text);
+
+        if (!resp.ok) {
+          alert(`No se pudo subir "${file.name}": HTTP ${resp.status}\n${text || 'sin mensaje del servidor'}`);
+          return;
+        }
+      } catch (err) {
+        console.error('Error fetch:', err);
+        alert('Error al enviar petición: ' + (err?.message || err));
+        return;
+      }
     }
+
+    //Limpia inputs y refresca listado
+    inp.value = '';
+    document.getElementById('fileDesc').value = '';
+    await refreshList();
   });
 
-  await refreshList();
+  //Acciones de la tabla evidencias (descargar / eliminar)
+  document.getElementById('tbFiles').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+
+  const act = btn.dataset.act;
+  const id = btn.dataset.id;
+
+  // Acción para el nuevo botón de descarga
+  if (act === 'download-evidence') {
+    const url = btn.dataset.url;
+    if (url) {
+      window.open(url, '_blank'); 
+    }
+    return;
+  }
+
+  // Acción para el botón de eliminar
+  if (act === 'delete-evidence') {
+    
+    const confirmed = await showConfirmationDialog('¿Estás seguro de querer eliminar esta evidencia? Esta acción no se puede deshacer.');
+    
+    if (!confirmed) {
+      return; 
+    }
+
+    //Llamar a la API para eliminar
+    try {
+      const res = await fetch(`${API}/evidences/${id}`, {
+        method: 'DELETE',
+        headers: { ...authHeaders() }
+      });
+
+      if (!res.ok) {
+        alert(`Error: No se pudo eliminar la evidencia (Estado: ${res.status})`);
+        return;
+      }
+
+      console.log(`Evidencia ${id} eliminada.`);
+      await refreshList(); 
+
+    } catch (err) {
+      console.error('Error al eliminar evidencia:', err);
+      alert('Error de red. No se pudo conectar con el servidor.');
+    }
+    
+    return;
+  }
+});
+
+
+  refreshList();
 }
+
 
 
 // --- View: Resources by objective ------------------------------------------
@@ -1346,7 +1485,7 @@ async function showIndicatorsForGoal(goalId) {
     </section>
   `;
 
-  // Back button: return to metas using stored context, or fallback to history.
+  // Volver a metas con contexto
   document.getElementById('btnBack')?.addEventListener('click', () => {
     const ctx = window.__metasCtx || JSON.parse(sessionStorage.getItem('metasCtx') || 'null');
     if (ctx && ctx.dimension && ctx.objetivo) {
@@ -1358,7 +1497,7 @@ async function showIndicatorsForGoal(goalId) {
 
   const $tb = document.getElementById('tbIndics');
 
-  // Initial load + paint
+  // Carga inicial
   let indicators = await loadIndicators();
   paintTable(indicators);
 
@@ -1626,7 +1765,7 @@ async function showStrategicGoalsEditor(dimensionValue, objetivo) {
   /** Create a new goal for the objective, then refresh the table. */
 let savingGoal = false;
 document.getElementById('btnAgregarFila')?.addEventListener('click', async () => {
-  if (savingGoal) return;                 // ← evita doble clic
+  if (savingGoal) return; 
   savingGoal = true;
   const btn = document.getElementById('btnAgregarFila');
   btn.disabled = true;
@@ -1674,52 +1813,6 @@ document.getElementById('btnAgregarFila')?.addEventListener('click', async () =>
       if (!res.ok) { alert('No se pudo eliminar la meta.'); return; }
       await refreshTable();
       return;
-    }
-  });
-}
-
-
-// --- Single indicator evidence upload (server) ------------------------------
-async function showIndicadoresPage(id) {
-  $title.textContent = `Indicadores — Registro ${id}`;
-  $view.innerHTML = `
-    <section class="card card--full">
-      <header class="card__header"><h2>Indicador ${esc(id)}</h2></header>
-      <div class="card__body" style="display:flex;flex-direction:column;gap:14px;">
-        <div>
-          <label class="lbl">Subir evidencia (PDF, DOCX, XLSX, PPTX, PNG, JPG)</label>
-          <input type="file" id="evFile" />
-          <input type="text" id="evDesc" class="inp" placeholder="Descripción (opcional)" />
-          <button class="btn" id="btnUp">Subir</button>
-        </div>
-        <div id="evMsg"></div>
-      </div>
-    </section>
-  `;
-
-  document.getElementById('btnUp')?.addEventListener('click', async () => {
-    const f = document.getElementById('evFile').files?.[0];
-    const d = document.getElementById('evDesc').value || '';
-    if (!f) { alert('Selecciona un archivo'); return; }
-
-    const fd = new FormData();
-    fd.append('file', f);
-    fd.append('description', d);
-
-    const res = await fetch(`${API}/indicators/${id}/evidences`, {
-      method: 'POST',
-      headers: { ...authHeaders() },
-      body: fd
-    });
-
-    const $msg = document.getElementById('evMsg');
-    if (res.ok) {
-      $msg.innerHTML = `<p class="ok">Evidencia subida con éxito.</p>`;
-      document.getElementById('evFile').value = '';
-      document.getElementById('evDesc').value = '';
-    } else {
-      const t = await res.text().catch(()=> '');
-      $msg.innerHTML = `<p class="err">Error al subir evidencia: ${esc(t || res.status)}</p>`;
     }
   });
 }

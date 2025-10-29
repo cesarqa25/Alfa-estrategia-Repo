@@ -104,6 +104,30 @@
       </header>
     <section id="view"></section>
   </main>
+  
+  <div id="evidence-modal" class="modal hidden">
+  <div class="modal__content">
+    <div class="modal__header">
+      <h3>Evidencias</h3>
+      <button class="modal__close" id="evidence-modal-close" aria-label="Cerrar">×</button>
+    </div>
+
+    <div id="evidence-list" class="evidence-list"></div>
+
+    <div id="evidence-upload" class="evidence-upload">
+      <!-- NUEVO: selector del plan (subdimensión/acción) -->
+      <select id="plan-select" aria-label="Subdimensión / Acción destino">
+        <option value="">Seleccione subdimensión / acción…</option>
+      </select>
+
+      <input type="file" id="evidence-file" />
+      <input type="text" id="evidence-desc" placeholder="Descripción (opcional)" />
+      <button id="evidence-upload-btn" class="btn">Subir</button>
+
+      <span class="hint">Se guardará en la subdimensión/acción seleccionada.</span>
+    </div>
+  </div>
+</div>
 
   <script type="module" src="js/app_dashboard.js"></script>
 </body>
