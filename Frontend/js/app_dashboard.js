@@ -43,32 +43,25 @@ window.navigateToIndicators = navigateToIndicators;
 
 /**
  * Muestra un diálogo de confirmación personalizado.
- * Utiliza estilos básicos inline para asegurar que se muestre como un overlay.
- * @param {string} message - El mensaje a mostrar.
- * @returns {Promise<boolean>} Resuelve a true si el usuario confirma, false si cancela.
+ * @param {string} message
+ * @returns {Promise<boolean>} 
  */
 function showConfirmationDialog(message) {
   return new Promise(resolve => {
-    // Crear el fondo (overlay)
     const overlay = document.createElement('div');
-    // Estilos inline básicos: full-screen, semi-transparente, centrado
     overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 9999; display: flex; justify-content: center; align-items: center;';
     
-    // Crear el contenedor del modal
     const modal = document.createElement('div');
     modal.style.cssText = 'background: white; padding: 30px; border-radius: 12px; max-width: 380px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.5);';
 
-    // Agregar el mensaje
     const msg = document.createElement('p');
     msg.textContent = message;
     msg.style.cssText = 'font-size: 1.1em; font-weight: 500; color: #333; margin-bottom: 25px;';
     modal.appendChild(msg);
 
-    // Contenedor de botones
     const btnContainer = document.createElement('div');
     btnContainer.style.cssText = 'display: flex; justify-content: space-between; gap: 15px;';
 
-    // Botón Denegar (Rechazar / Cancelar)
     const btnDeny = document.createElement('button');
     btnDeny.className = 'btn btn--ghost';
     btnDeny.textContent = 'Denegar';
@@ -78,9 +71,8 @@ function showConfirmationDialog(message) {
       resolve(false);
     };
 
-    // Botón Aceptar (Confirmar)
     const btnAccept = document.createElement('button');
-    btnAccept.className = 'btn btn--danger'; // Usamos una clase para indicar acción peligrosa
+    btnAccept.className = 'btn btn--danger'; 
     btnAccept.textContent = 'Aceptar';
     btnAccept.style.cssText = 'flex-grow: 1;';
     btnAccept.onclick = () => {
@@ -145,6 +137,37 @@ function pintarAvance(valor) {
     ring.style.setProperty('--value', cur);
     txt.textContent = `${cur}%`;
     if (cur < target) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/** Anima el anillo de progreso pequeño hasta el % objetivo. */
+function pintarAvancePequeño(id, valor) {
+  const ring = document.getElementById(`ring-${id}`);
+  const txt = document.getElementById(`ring-value-${id}`);
+  if (!ring || !txt) return;
+
+  ring.style.setProperty('--value', 0);
+  const target = Math.max(0, Math.min(100, valor));
+  let cur = 0;
+
+  const color = (target >= 100) ? 'var(--ok)' : 'var(--primary)';
+  ring.style.setProperty('--fill-color', color);
+  const step = () => {
+    const diff = target - cur;
+    if (diff < 0.1) { 
+      cur = target;
+      ring.style.setProperty('--value', target);
+      txt.textContent = `${target.toFixed(1)}%`;
+      return; 
+    }
+
+    const increment = Math.max(0.1, diff / 8);
+    cur += increment;
+
+    ring.style.setProperty('--value', cur);
+    txt.textContent = `${cur.toFixed(1)}%`;
+    requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
@@ -512,11 +535,23 @@ async function showPlanList(dimensionValue) {
   const { groups } = await getPlansByDimension(dimensionValue);
   if (!groups || groups.size === 0) { $list.innerHTML = `<p>Sin planes para esta dimensión.</p>`; return; }
 
+  const objetives = await apiListObjectivesByDim(dimensionValue).catch(() => []);
+
+  const progressMap = new Map();
+  for(const obj of objetives){
+    progressMap.set(obj.name, obj.average_progress_pct);
+  }
+
   let i = 1;
   let html = `<ol class="obj-list">`;
   const orden = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'));
   for (const [objetivo, items] of orden) {
     const oEnc = encodeURIComponent(objetivo);
+    const realAvgPct = progressMap.get(objetivo) ?? 0;
+    const isRealData = progressMap.has(objetivo);
+    const finalPct = isRealData ? realAvgPct : 0; // Usamos 0 si no hay dato
+    const sanitizedPct = Math.max(0, Math.min(100, finalPct));
+    const elementId = `obj-${i}`;
     html += `
       <li class="obj-item">
         <div class="obj-item__title">
@@ -529,6 +564,11 @@ async function showPlanList(dimensionValue) {
           ` : ''}
         </div>
         <div class="obj-item__actions">
+          <div class="obj-item__progress">
+            <div class="ring-small" id="ring-${elementId}" style="--value: 0" aria-label="Avance ${realAvgPct}%">
+              <div class="ring__inside-small"><div class="ring__value-small" id="ring-value-${elementId}">${realAvgPct.toFixed(1)}%</div>
+            </div>
+          </div>
           <button class="btn btn--sm" data-act="ver" data-obj="${oEnc}">Ir al objetivo</button>
           <button class="btn btn--sm btn--ghost" data-act="rec" data-obj="${oEnc}">Recursos del objetivo</button>
           <button class="btn btn--sm" data-act="evi" data-obj="${oEnc}">Evidencia</button>
@@ -539,6 +579,15 @@ async function showPlanList(dimensionValue) {
   }
   html += `</ol>`;
   $list.innerHTML = html;
+
+  orden.forEach(([objetivoNombre, items], index) => {
+    const elementId = `obj-${index + 1}`; 
+    const realAvgPct = progressMap.get(objetivoNombre) ?? 0;
+    const isRealData = progressMap.has(objetivoNombre);
+    const finalPct = isRealData ? realAvgPct : 0; // Usamos 0 si no hay dato real
+    const sanitizedPct = Math.max(0, Math.min(100, finalPct));
+    pintarAvancePequeño(elementId, sanitizedPct);
+  });
 
 $list.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-act]');
@@ -727,9 +776,6 @@ const { groups } = await getPlansByDimension(dimensionValue);
   });
 
 }
-
-//----------FIN Cambio para filtros-----------------
-
 
 // --- Local evidence storage (IndexedDB) — utilidades (se preservan) ---------
 const DB_NAME = 'evidenciasDB';
@@ -937,10 +983,6 @@ async function showEvidenceUpload(dimensionValue, objetivo) {
 
 
 // --- View: Resources by objective ------------------------------------------
-/**
- * Show resources table for all plans belonging to the objective.
- * Fetches each plan's resources and flattens them into rows.
- */
 async function showObjectiveResources(dimensionValue, objetivo) {
   const { groups } = await getPlansByDimension(dimensionValue);
   const plans = (groups.get(objetivo) || []).slice()
@@ -1065,15 +1107,18 @@ async function showObjectiveResources(dimensionValue, objetivo) {
 }
 
 
+// ----------- Funcion que asegura el refresco para la logica mas "pesada"----------------
+function debounce(func, timeout = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            func.apply(this, args);
+        }, timeout);
+    };
+}
+
 // --- View: Indicators for a goal -------------------------------------------
-/**
- * Indicators UI for a single goal:
- * - load + render indicators
- * - create new indicators
- * - inline progress calculators (percent/count/free)
- * - delete indicator
- * - back to metas (using stored context)
- */
 async function showIndicatorsForGoal(goalId) {
   async function loadIndicators() {
     const list = await apiListIndicatorsByGoal(goalId).catch(() => []);
@@ -1091,88 +1136,114 @@ async function showIndicatorsForGoal(goalId) {
   /** Render indicator rows and associated collapsible progress panels. */
   function paintTable(indics) {
     if (!indics.length) {
-      $tb.innerHTML = `<tr><td colspan="5">Sin indicadores para esta meta.</td></tr>`;
+      $tb.innerHTML = `<tr><td colspan="6">Sin indicadores para esta meta.</td></tr>`;
       return;
     }
+
+    const progresses = [];
+
     $tb.innerHTML = indics.map((x, idx) => {
       const kind = classifyUnit(x.unit);
+      
+      let avancePct = 0;
+      if (kind === 'percent' || kind === 'count') {
+        const total = x.progress_total;
+        const obt = x.progress_obtained;
+        if (total > 0 && obt >= 0) {
+          const pctRaw = (obt / total) * 100;
+          avancePct = Math.max(0, Math.min(100, pctRaw));
+        }
+      }
+
+      progresses.push(avancePct);
+
+      const avanceWidth = avancePct.toFixed(1);
+      const barColor = avancePct >= 100 ? '#28a745' : '#007bff';
+
       return `
-        <tr data-id="${x.id}" data-kind="${kind}">
+        <tr data-id="${x.id}" data-kind="${kind}" style="vertical-align: middle;">
           <td>${idx + 1}</td>
-          <td>${esc(x.title || '—')}</td>
+          <td style="word-break: break-word;">${esc(x.title || '—')}</td>
           <td>${esc(x.unit || '—')}</td>
           <td>${x.target == null ? '—' : esc(x.target)}</td>
-          <td>
-            <button class="btn btn--sm" data-act="prog" style="margin=5px 0;">Progreso</button>
-            <button class="btn btn--sm btn--ghost" data-act="del">Eliminar</button>
+          <td style="  display: table-cell;  padding: 1.5rem;">
+              <div style="  width: 100%; height:25px; background:#aaa; border-radius:4px; overflow:hidden; position: relative;">
+                <div style="width: ${avanceWidth}%; height: 100%; background: ${barColor}; position: absolute; top: 0; left: 0;"></div>
+                <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: bold; text-shadow: 0 0 2px black;">
+                 ${avanceWidth}%
+                </span>
+              </div>
+          </td>
+          <td style="text-align: center; vertical-align: middle;">
+            <div style="display: flex;justify-content: center;">
+              <button class="btn btn--sm" data-act="prog" style="margin=5px 0;">Progreso</button>
+              <button class="btn btn--sm btn--ghost" data-act="del">Eliminar</button>
+            </div>
           </td>
         </tr>
 
         <tr class="prog-row" data-for="${x.id}" style="display:none;">
-          <td colspan="5">
+          <td colspan="6">
             <div class="prog-box">
               ${(() => {
                 if (kind === 'percent') {
-                  return `
+                  return ` 
                     <div class="prog-grid">
                       <label>Cantidad total
-                        <input type="number" min="0" step="1" class="inp prog-total" data-id="${x.id}" placeholder="Ej: 100">
+                        <input type="number" min="0" step="1" class="inp prog-total" data-id="${x.id}" placeholder="Ej: 100" value="${x.progress_total ?? ''}">
                       </label>
                       <label>Cantidad obtenida
-                        <input type="number" min="0" step="1" class="inp prog-obt" data-id="${x.id}" placeholder="Ej: 80">
+                        <input type="number" min="0" step="1" class="inp prog-obt" data-id="${x.id}" placeholder="Ej: 80" value="${x.progress_obtained ?? ''}">
                       </label>
                       <div class="prog-result" id="prog-res-${x.id}">
                         <span class="badge">%</span> <strong>Resultado:</strong> —
                       </div>
                     </div>
-                  `;
+                   `;
                 } else if (kind === 'count') {
                   return `
                     <div class="prog-grid">
                       <label>Cantidad total
-                        <input type="number" min="0" step="1" class="inp prog-total" data-id="${x.id}" placeholder="Ej: 4">
+                       <input type="number" min="0" step="1" class="inp prog-total" data-id="${x.id}" placeholder="Ej: 4" value="${x.progress_total ?? ''}">
                       </label>
                       <label>Cantidad obtenida
-                        <input type="number" min="0" step="1" class="inp prog-obt" data-id="${x.id}" placeholder="Ej: 2">
+                        <input type="number" min="0" step="1" class="inp prog-obt" data-id="${x.id}" placeholder="Ej: 2" value="${x.progress_obtained ?? ''}">
                       </label>
                       <div class="prog-result" id="prog-res-${x.id}">
-                        <span class="badge">n°</span> <strong>Resultado:</strong> —
+                       <span class="badge">n°</span> <strong>Resultado:</strong> —
                       </div>
                     </div>
                   `;
                 } else {
                   return `
-                    <div class="prog-grid">
+                     <div class="prog-grid">
                       <label>Valor actual
-                        <input type="text" class="inp prog-free" data-id="${x.id}" placeholder="Ej: 3.5 pts">
+                        <input type="text" class="inp prog-free" data-id="${x.id}" placeholder="Ej: 3.5 pts" value="${x.progress_free ?? ''}">
                       </label>
-                      <div class="prog-result" id="prog-res-${x.id}">
+                        <div class="prog-result" id="prog-res-${x.id}">
                         <span class="badge">•</span> <strong>Resultado:</strong> —
                       </div>
                     </div>
                   `;
                 }
-              })()}
+               })()}
             </div>
           </td>
         </tr>
-      `;
+       `;
     }).join('');
 
+    
+    if(progresses.length > 0){
+      const totalProgress = progresses.reduce((sum, pct) => sum + pct, 0);
+      const averageProgress = totalProgress / progresses.length;
+      console.log(`Promedio de avance del objetivo (Meta ${goalId}): ${averageProgress.toFixed(1)}%`);
+    }
+    
     // Restore locally-saved progress inputs per indicator id.
     indics.forEach(x => {
-      const saved = JSON.parse(localStorage.getItem(`ind-prog-${x.id}`) || 'null');
-      if (!saved) return;
       const kind = classifyUnit(x.unit);
-      if (kind === 'percent' || kind === 'count') {
-        const t = document.querySelector(`.prog-total[data-id="${x.id}"]`);
-        const o = document.querySelector(`.prog-obt[data-id="${x.id}"]`);
-        if (t) t.value = saved.total ?? '';
-        if (o) o.value = saved.obt ?? '';
-        computeAndRenderProgress(x.id, kind);
-      } else {
-        const f = document.querySelector(`.prog-free[data-id="${x.id}"]`);
-        if (f) f.value = saved.free ?? '';
+      if (x.progress_total || x.progress_free){
         computeAndRenderProgress(x.id, kind);
       }
     });
@@ -1185,9 +1256,11 @@ async function showIndicatorsForGoal(goalId) {
    * - other:   echoes a free text value
    * Persists the input locally per indicator id.
    */
-  function computeAndRenderProgress(id, kind) {
+  async function computeAndRenderProgress(id, kind) {
     const $out = document.getElementById(`prog-res-${id}`);
     if (!$out) return;
+
+    let dataToSave = {};
 
     if (kind === 'percent' || kind === 'count') {
       const $t = document.querySelector(`.prog-total[data-id="${id}"]`);
@@ -1195,24 +1268,34 @@ async function showIndicatorsForGoal(goalId) {
       const total = Number($t?.value ?? 0);
       const obt   = Number($o?.value ?? 0);
 
-      if (!Number.isFinite(total) || total <= 0) { $out.innerHTML = `<strong>Resultado:</strong> —`; return; }
-      if (!Number.isFinite(obt)   || obt < 0)    { $out.innerHTML = `<strong>Resultado:</strong> —`; return; }
+      // Lógica de cálculo y visualización
+      if (total > 0 && obt >= 0){
+        const pctRaw = (obt / total) * 100;
+        const pct = Math.max(0, Math.min(100, pctRaw));
+        dataToSave = { progress_total: total, progress_obtained: obt};
 
-      if (kind === 'percent') {
-        const pct = Math.max(0, Math.min(100, (obt / total) * 100));
-        $out.innerHTML = `<strong>Resultado:</strong> ${pct.toFixed(1)} %`;
-        localStorage.setItem(`ind-prog-${id}`, JSON.stringify({ total, obt }));
-      } else {
-        $out.innerHTML = `<strong>Resultado:</strong> ${obt}/${total}`;
-        localStorage.setItem(`ind-prog-${id}`, JSON.stringify({ total, obt }));
+        if (kind === 'percent'){
+          $out.innerHTML = `<span class="badge">%</span> <strong>Resultado:</strong> ${pct.toFixed(1)} %`;
+        }
+        else {
+          $out.innerHTML = `<span class="badge">n°</span> <strong>Resultado:</strong> ${obt}/${total} (${pct.toFixed(1)} %)`; 
+        }
       }
-      return;
+      else{
+        $out.innerHTML = `<span class="badge">${kind === 'percent' ? '%' : 'n°'}</span> <strong>Resultado:</strong> —`;
+      }
     }
 
-    const $f = document.querySelector(`.prog-free[data-id="${id}"]`);
-    const v = ($f?.value ?? '').trim();
-    $out.innerHTML = `<strong>Resultado:</strong> ${v || '—'}`;
-    localStorage.setItem(`ind-prog-${id}`, JSON.stringify({ free: v || '' }));
+    else if (kind === 'other') {
+      const $f = document.querySelector(`.prog-free[data-id="${id}"]`);
+      const v = ($f?.value ?? '').trim();
+      $out.innerHTML = `<span class="badge">•</span> <strong>Resultado:</strong> ${v || '—'}`;
+      dataToSave = {progress_free: v || ''};
+    }
+
+    if (Object.keys(dataToSave).length > 0){
+      await apiUpdateIndicatorProgress(id, dataToSave);
+    }
   }
 
 
@@ -1249,9 +1332,10 @@ async function showIndicatorsForGoal(goalId) {
             <thead>
               <tr>
                 <th class="w-xs">#</th>
-                <th>Indicador</th>
+                <th style="word-break: break-word;">Indicador</th>
                 <th class="w-sm">Unidad</th>
                 <th class="w-sm">Meta/Target</th>
+                <th class="w-sm">Progreso</th>
                 <th class="w-md">Acciones</th>
               </tr>
             </thead>
@@ -1279,34 +1363,72 @@ async function showIndicatorsForGoal(goalId) {
   paintTable(indicators);
 
   // Create indicator handler (validates + refreshes list)
-let savingInd = false;
-document.getElementById('btnAddIndic')?.addEventListener('click', async () => {
-  if (savingInd) return;
-  savingInd = true;
-  const btn = document.getElementById('btnAddIndic');
-  btn.disabled = true;
+  let savingInd = false;
+  document.getElementById('btnAddIndic')?.addEventListener('click', async () => {
+    if (savingInd) return;
+    savingInd = true;
+    const btn = document.getElementById('btnAddIndic');
+    btn.disabled = true;
 
-  try {
-    const nombre = document.getElementById('indNombre').value.trim();
-    const unidad = document.getElementById('indUnidad').value.trim();
-    const targetStr = document.getElementById('indTarget').value.trim();
-    if (!nombre) { alert('Ingresa el nombre del indicador.'); return; }
+    try {
+      const nombre = document.getElementById('indNombre').value.trim();
+      const unidad = document.getElementById('indUnidad').value.trim();
+      const targetStr = document.getElementById('indTarget').value.trim();
+      if (!nombre) { alert('Ingresa el nombre del indicador.'); return; }
 
-    await apiCreateIndicator(goalId, { title: nombre, unit: unidad || undefined, target: targetStr || undefined });
+      await apiCreateIndicator(goalId, { title: nombre, unit: unidad || undefined, target: targetStr || undefined });
 
-    document.getElementById('indNombre').value = '';
-    document.getElementById('indUnidad').value = '';
-    document.getElementById('indTarget').value = '';
-    const indicators = await apiListIndicatorsByGoal(goalId).catch(() => []);
-    paintTable(indicators);
-  } catch (err) {
-    alert('No se pudo crear el indicador.\n' + (err?.message || ''));
-  } finally {
-    savingInd = false;
-    btn.disabled = false;
+      document.getElementById('indNombre').value = '';
+      document.getElementById('indUnidad').value = '';
+      document.getElementById('indTarget').value = '';
+      const indicators = await apiListIndicatorsByGoal(goalId).catch(() => []);
+      paintTable(indicators);
+    } catch (err) {
+      alert('No se pudo crear el indicador.\n' + (err?.message || ''));
+    } finally {
+      savingInd = false;
+      btn.disabled = false;
+    }
+  });
+
+  async function apiUpdateIndicatorProgress(indicatorId, data) {
+    const res = await fetch(`${API}/indicators/${indicatorId}/progress`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders() 
+        },
+        body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+        throw new Error('No se pudo actualizar el progreso del indicador.');
+    }
   }
-});
 
+  // Nueva función para manejar el guardado y el refresco 
+    async function handleProgressInput(id, kind) {
+        // Guardar en la API (Lógica que estaba dentro del listener)
+        await computeAndRenderProgress(id, kind); 
+
+        // Guardar el estado actual del panel (para que no se cierre)
+        const progRow = document.querySelector(`tr.prog-row[data-for="${id}"]`);
+        const wasOpen = progRow?.style.display !== 'none';
+
+        // Cargar la lista más reciente de indicadores (con los datos guardados)
+        // La variable 'indicators' DEBE ser accesible aquí, asumiendo que está declarada con 'let' en el scope superior.
+        indicators = await apiListIndicatorsByGoal(goalId).catch(() => []); 
+
+        // Redibujar la tabla
+        paintTable(indicators);
+
+        // Restaurar el estado del panel
+        if (wasOpen) {
+            const newProgRow = document.querySelector(`tr.prog-row[data-for="${id}"]`);
+            if (newProgRow) {
+                newProgRow.style.display = '';
+            }
+        }
+    }
 
   // Table actions: toggle progress panel / delete indicator
   $tb.addEventListener('click', async (e) => {
@@ -1318,10 +1440,10 @@ document.getElementById('btnAddIndic')?.addEventListener('click', async () => {
     if (btn.dataset.act === 'prog') {
       const row = document.querySelector(`tr.prog-row[data-for="${id}"]`);
       if (!row) return;
-      row.style.display = row.style.display === 'none' ? '' : 'none';
+        row.style.display = row.style.display === 'none' ? '' : 'none';
       return;
     }
-
+    
     if (btn.dataset.act === 'del') {
       if (!confirm('¿Eliminar este indicador?')) return;
       const res = await fetch(`${API}/indicators/${id}`, { method:'DELETE', headers: { ...authHeaders() }});
@@ -1333,14 +1455,21 @@ document.getElementById('btnAddIndic')?.addEventListener('click', async () => {
   });
 
   // Live progress calculation on input changes
+  const debouncedProgressInput = debounce(handleProgressInput, 800);
+
   $tb.addEventListener('input', (e) => {
     const inp = e.target;
-    const id  = inp?.dataset?.id;
+    if (!inp.classList.contains('prog-total') && !inp.classList.contains('prog-obt') && !inp.classList.contains('prog-free')) {
+        return;
+    }
+    
+    const id = inp?.dataset?.id;
     if (!id) return;
     const hostRow = document.querySelector(`tr[data-id="${id}"]`);
     const kind = hostRow?.dataset.kind;
-    computeAndRenderProgress(id, kind);
-  });
+
+    debouncedProgressInput(id, kind);
+});
 }
 
 
@@ -1358,10 +1487,6 @@ async function showReportes() {
 
 
 // --- UI: animated accordion in the sidebar ---------------------------------
-/**
- * Add smooth open/close animation to <details> accordion menus
- * by animating max-height.
- */
 function setupAccordionTransition() {
   document.querySelectorAll('.nav__details').forEach(details => {
     const content = details.querySelector('.nav__submenu-content');
@@ -1402,14 +1527,6 @@ function setupAccordionTransition() {
 
 
 // --- View: Strategic goals (Metas) editor -----------------------------------
-/**
- * Metas editor for an objective:
- * - ensures an Objective exists
- * - lets the user add goals (title/period/year)
- * - lists existing goals with actions:
- *    * go to Indicators (persists context)
- *    * delete goal
- */
 async function showStrategicGoalsEditor(dimensionValue, objetivo) {
   window.__metasCtx = { dimension: dimensionValue, objetivo };
   sessionStorage.setItem('metasCtx', JSON.stringify(window.__metasCtx));
@@ -1563,10 +1680,6 @@ document.getElementById('btnAgregarFila')?.addEventListener('click', async () =>
 
 
 // --- Single indicator evidence upload (server) ------------------------------
-/**
- * Minimal page to upload an evidence file to an indicator (server endpoint).
- * Keeps it for completeness; not tied to the metas flow.
- */
 async function showIndicadoresPage(id) {
   $title.textContent = `Indicadores — Registro ${id}`;
   $view.innerHTML = `
