@@ -202,7 +202,7 @@ content: '▾';
   overflow: hidden;
 }
 .card--wide { grid-column: 1 / -1; }
-.card__header { padding: 14px 16px; border-bottom: 1px solid #eef2ff; }
+.card__header { padding: 14px 16px 0 16px; border-bottom: 1px solid #eef2ff; }
 .card__header h2 { margin: 0; font-size: 16px; }
 .card__body { padding: 16px; }
 
@@ -210,25 +210,25 @@ content: '▾';
 .plan { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
 .progress { display: grid; place-items: center; }
 .ring {
-  --size: 140px;
+  --size: 150px;
   width: var(--size); height: var(--size);
   border-radius: 50%;
   background: conic-gradient(var(--primary) calc(var(--value) * 1%), var(--ring-bg) 0);
   display: grid; place-items: center;
 }
 .ring__inside {
-  width: calc(var(--size) - 28px); height: calc(var(--size) - 28px);
+  width: calc(var(--size) - 32px); height: calc(var(--size) - 32px);
   border-radius: 50%; background: #fff; display: grid; place-items: center;
 }
-.ring__value { font-size: 28px; font-weight: 700; color: var(--primary-600); }
+.ring__value { font-size: 30px; font-weight: 700; color: var(--primary-600); }
 
-.stats { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.stats li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: #f8fafc; border-radius: 10px; }
+.stats { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
+.stats li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; background: #eef0f1; border-radius: 10px; }
 .stats span { color: var(--muted); }
 
 /* Report list */
 .report { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-.report li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #f8fafc; border-radius: 10px; }
+.report li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #eef0f1; border-radius: 10px; }
 .chip { padding: 4px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; color: #0b1220; }
 .chip--ok { background: #dcfce7; color: #166534; }
 .chip--info { background: #e0f2fe; color: #075985; }

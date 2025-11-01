@@ -81,10 +81,28 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # ------- Database URL (MySQL) --------
-DATABASE_URL = "mysql+pymysql://root:2025@127.0.0.1:3306/colegio_db"
+#DATABASE_URL = "mysql+pymysql://root:2025@127.0.0.1:3306/colegio_db"
 
 # SQLAlchemy setup
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+#engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+
+# --- DB (AWS MySQL - ALPHA) ---
+DATABASE_URL = (
+    "mysql+pymysql://app_alpha_dev:"
+    "Alpha%402025.DevHub%21"
+    "@dev-db-alpha.unabdevhub.cl:3306/alpha_dev"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,          
+    pool_recycle=1800,           
+    future=True,
+    connect_args={
+        "ssl": {}   
+    },
+)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
 
@@ -213,7 +231,7 @@ class GoalModel(Base):
     year = Column(Integer, nullable=False)
     objective_id = Column(Integer, ForeignKey("objectives.id", ondelete="RESTRICT"), nullable=False, index=True)
     objective = relationship("ObjectiveModel", back_populates="goals")
-    indicators = relationship("IndicatorModel", back_populates="goal")
+    indicators = relationship("IndicatorModel", back_populates="goal", cascade="all, delete-orphan")
     __table_args__ = (
         UniqueConstraint('objective_id', 'title', 'year', name='uniq_goal_obj_title_year'),
     )
@@ -534,6 +552,13 @@ class StrategicGoalOut(BaseModel):
     descripcion_indicador: str
     class Config: from_attributes = True
 
+class StatsTotals(BaseModel):
+    indicadores: int
+    metas: int
+    actividades: int
+    recursos: int
+
+
 @app.get("/auth/me", response_model=MeOut)
 def me(u: UserModel = Depends(get_current_user)):
     return MeOut(id=u.id, rut=u.rut, name=u.name, email=u.email, role=u.role, is_active=u.is_active)
@@ -725,9 +750,8 @@ def list_objectives(
         case(
             (IndicatorModel.progress_total > 0, 
              (IndicatorModel.progress_obtained / IndicatorModel.progress_total) * 100),
-            else_=0.0
-        ),
-        0.0 
+            else_=None
+        )
     )
 
     #Agrupa por ID del objetivo
@@ -737,11 +761,12 @@ def list_objectives(
             func.avg(pct_per_indicator).label('avg_pct')
         )
         .join(IndicatorModel, IndicatorModel.goal_id == GoalModel.id)
+        .where(IndicatorModel.title != 'Evidencias')
         .group_by(GoalModel.objective_id)
         .subquery()
     )
 
-    q = db.query(ObjectiveModel).order_by(ObjectiveModel.id.asc())
+    q = db.query(ObjectiveModel).filter(ObjectiveModel.dimension != None).order_by(ObjectiveModel.id.asc())
     
     #Unir la tabla de objetivos con el resultado del promedio
     q = q.outerjoin(
@@ -868,9 +893,7 @@ def delete_goal(goal_id: int, db: Session = Depends(get_db)):
     m = db.get(GoalModel, goal_id)
     if not m:
         raise HTTPException(status_code=404, detail="Goal not found")
-    child_count = db.execute(select(func.count(IndicatorModel.id)).where(IndicatorModel.goal_id == goal_id)).scalar()
-    if child_count and child_count > 0:
-        raise HTTPException(status_code=409, detail="Goal has indicators; delete them first")
+    
     db.delete(m)
     return Response(status_code=204)
 
@@ -1360,6 +1383,46 @@ def delete_strategic_goal(
     if not rec: raise HTTPException(404, "No encontrado")
     db.delete(rec); db.commit()
     return {"ok": True}
+
+
+# ===================================================================
+#                       STATS TOTALES (DASHBOARD)
+# ===================================================================
+
+@app.get("/stats/totals", response_model=StatsTotals)
+def get_stats_totals(
+    db: Session = Depends(get_db),
+    user = Depends (get_current_user)
+    ):
+
+    """
+    Obtiene los conteos totales para los indicadores, metas,
+    actividades (planes) y la suma de recursos para el dashboard.
+    """
+
+    total_indicadores = db.execute(
+        select(func.count(IndicatorModel.id))
+    ).scalar() or 0
+
+    total_metas = db.execute(
+        select(func.count(GoalModel.id))
+    ).scalar() or 0
+
+    total_actividades = db.execute(
+        select(func.count(StrategicPlanModel.id))
+    ).scalar() or 0
+
+    total_recursos = db.execute(
+        select(func.sum(StrategicResourceModel.monto_total))
+    ).scalar() or 0
+
+    return StatsTotals(
+        indicadores=total_indicadores,
+        metas=total_metas,
+        actividades=total_actividades,
+        recursos=total_recursos
+    )
+    
 
 # Health
 @app.get("/health")
