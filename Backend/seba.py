@@ -453,6 +453,7 @@ class DimensionEnum(str, Enum):
 class RoleEnum(str, Enum):
     editor = "editor"
     viewer = "viewer"
+    progress_editor = "progress_editor"
 
 class StrategicPlanCreate(BaseModel):
     dimension: DimensionEnum
@@ -745,7 +746,6 @@ def list_objectives(
     Lista objetivos con filtros opcionales por dimension y/o name,
     incluyendo el avance promedio de sus indicadores.
     """
-    # Calcula % de avance por indicador
     pct_per_indicator = func.coalesce(
         case(
             (IndicatorModel.progress_total > 0, 
@@ -754,7 +754,6 @@ def list_objectives(
         )
     )
 
-    #Agrupa por ID del objetivo
     avg_progress_subquery = (
         select(
             GoalModel.objective_id,
@@ -767,20 +766,15 @@ def list_objectives(
     )
 
     q = db.query(ObjectiveModel).filter(ObjectiveModel.dimension != None).order_by(ObjectiveModel.id.asc())
-    
-    #Unir la tabla de objetivos con el resultado del promedio
     q = q.outerjoin(
         avg_progress_subquery,
         avg_progress_subquery.c.objective_id == ObjectiveModel.id
     )
-    
-    #Aplicar filtros
     if dimension:
         q = q.filter(ObjectiveModel.dimension == dimension)
     if name:
-        q = q.filter(ObjectiveModel.name == name)
-        
-    #Seleccionar ObjectiveModel y el promedio calculado
+        q = q.filter(ObjectiveModel.name == name)       
+
     q = q.with_entities(
         ObjectiveModel,
         avg_progress_subquery.c.avg_pct.label('average_progress_pct')
@@ -788,7 +782,6 @@ def list_objectives(
 
     objs_data = q.offset(skip).limit(limit).all()
     
-    #Mapear y devolver los datos
     results = []
     for obj_model, avg_pct in objs_data:
         results.append(objective_to_pydantic(obj_model, avg_pct if avg_pct is not None else 0.0))
@@ -810,9 +803,11 @@ def delete_objective(objective_id: int, db: Session = Depends(get_db)):
     m = db.get(ObjectiveModel, objective_id)
     if not m:
         raise HTTPException(status_code=404, detail="Objective not found")
-    child_count = db.execute(select(func.count(GoalModel.id)).where(GoalModel.objective_id == objective_id)).scalar()
-    if child_count and child_count > 0:
-        raise HTTPException(status_code=409, detail="Objective has goals; delete them first")
+    
+    #child_count = db.execute(select(func.count(GoalModel.id)).where(GoalModel.objective_id == objective_id)).scalar()
+    #if child_count and child_count > 0:
+        #raise HTTPException(status_code=409, detail="Objective has goals; delete them first")
+    
     db.delete(m)
     return Response(status_code=204)
 
@@ -821,16 +816,18 @@ def delete_objective(objective_id: int, db: Session = Depends(get_db)):
 # ====================
 
 @app.post("/objectives/{objective_id}/goals", response_model=Goal, status_code=201)
-def create_goal(objective_id: int, payload: GoalCreate, db: Session = Depends(get_db), response: Response = None):
-    """Create a goal under an objective; enforce that the goal year is within the objective range.
-       Idempotente por (objective_id, title, year)."""
+def create_goal(objective_id: int, payload: GoalCreate, db: Session = Depends(get_db), response: Response = None, user: "UserModel" = Depends(require_role("editor"))):
+    """
+    Create a goal under an objective. Idempotent by (objective_id, title, year).
+    Returns 201 if created, 200 if it already existed.
+    """
     obj = db.get(ObjectiveModel, objective_id)
     if not obj:
         raise HTTPException(status_code=404, detail="Objective not found")
     if not (obj.start_year <= payload.year <= obj.end_year):
         raise HTTPException(status_code=400, detail="Goal year must be within the objective period")
 
-    # 1) ¿Ya existe?
+    # 1) Check if exists
     existing = (
         db.query(GoalModel)
           .filter(
@@ -841,19 +838,17 @@ def create_goal(objective_id: int, payload: GoalCreate, db: Session = Depends(ge
           .first()
     )
     if existing:
-        # Devolver el existente con 200 (no creado)
         if response is not None:
             response.status_code = 200
         return goal_to_pydantic(existing)
 
-    # 2) Crear (protegido por índice único)
+    # 2) Create
     m = GoalModel(objective_id=objective_id, **asdict(payload))
     db.add(m)
     try:
-        db.flush()  # o db.commit() si tu patrón lo requiere aquí
+        db.flush()
     except IntegrityError:
         db.rollback()
-        # Buscar y devolver el existente (otra request paralela lo insertó)
         again = (
             db.query(GoalModel)
               .filter(
@@ -867,7 +862,6 @@ def create_goal(objective_id: int, payload: GoalCreate, db: Session = Depends(ge
             if response is not None:
                 response.status_code = 200
             return goal_to_pydantic(again)
-        # Si no lo encontramos, reporta conflicto
         raise HTTPException(status_code=409, detail="Goal already exists")
     return goal_to_pydantic(m)
 
@@ -888,12 +882,15 @@ def get_goal(goal_id: int, db: Session = Depends(get_db)):
     return goal_to_pydantic(m)
 
 @app.delete("/goals/{goal_id}", status_code=204)
-def delete_goal(goal_id: int, db: Session = Depends(get_db)):
-    """Delete a goal only if it has no indicators."""
+def delete_goal(goal_id: int, db: Session = Depends(get_db), user: "UserModel" = Depends(require_role("editor"))):
+    """Delete a goal. Fails (409) if it has child indicators."""
     m = db.get(GoalModel, goal_id)
     if not m:
         raise HTTPException(status_code=404, detail="Goal not found")
     
+    child_count = db.execute(select(func.count(IndicatorModel.id)).where(IndicatorModel.goal_id == goal_id)).scalar()
+    if child_count and child_count > 0:
+        raise HTTPException(status_code=409, detail="Goal has indicators; delete them first")
     db.delete(m)
     return Response(status_code=204)
 
@@ -902,13 +899,15 @@ def delete_goal(goal_id: int, db: Session = Depends(get_db)):
 # ====================
 
 @app.post("/goals/{goal_id}/indicators", response_model=Indicator, status_code=201)
-def create_indicator(goal_id: int, payload: IndicatorCreate, db: Session = Depends(get_db), response: Response = None):
-    """Create an indicator for a goal. Idempotente por (goal_id, title, unit)."""
+def create_indicator(goal_id: int, payload: IndicatorCreate, db: Session = Depends(get_db), response: Response = None, user: "UserModel" = Depends(require_role("editor"))):
+    """
+    Create an indicator for a goal. Idempotent by (goal_id, title, unit).
+    Returns 201 if created, 200 if it already existed.
+    """
     parent = db.get(GoalModel, goal_id)
     if not parent:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    # Al comparar unit, cuida el NULL
     unit = getattr(payload, "unit", None)
     q = db.query(IndicatorModel).filter(
         IndicatorModel.goal_id == goal_id,
@@ -924,7 +923,7 @@ def create_indicator(goal_id: int, payload: IndicatorCreate, db: Session = Depen
     m = IndicatorModel(goal_id=goal_id, **asdict(payload))
     db.add(m)
     try:
-        db.flush()  # o db.commit()
+        db.flush()
     except IntegrityError:
         db.rollback()
         again = db.query(IndicatorModel).filter(
@@ -955,11 +954,14 @@ def get_indicator(indicator_id: int, db: Session = Depends(get_db)):
     return indicator_to_pydantic(m)
 
 @app.delete("/indicators/{indicator_id}", status_code=204)
-def delete_indicator(indicator_id: int, db: Session = Depends(get_db)):
-    """Delete an indicator only if it has no evidences attached."""
+def delete_indicator(indicator_id: int, db: Session = Depends(get_db), user: "UserModel" = Depends(require_role("editor"))):
+    """Delete an indicator. Fails (409) if it has child evidences."""
     m = db.get(IndicatorModel, indicator_id)
     if not m:
         raise HTTPException(status_code=404, detail="Indicator not found")
+    child_count = db.execute(select(func.count(EvidenceModel.id)).where(EvidenceModel.indicator_id == indicator_id)).scalar()
+    if child_count and child_count > 0:
+        raise HTTPException(status_code=409, detail="Indicator has evidences; delete them first")
     db.delete(m)
     return Response(status_code=204)
 
@@ -967,51 +969,48 @@ def delete_indicator(indicator_id: int, db: Session = Depends(get_db)):
 async def update_indicator_progress(
     indicator_id: int,
     data: IndicatorProgressUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db), user : "UserModel" = Depends(require_role("editor" , "progress_editor"))
 ):
     """
-    Recibe la actualización de progreso (total, obtenido, o texto libre) 
-    y actualiza el indicador en la DB.
+    Update an indicator's progress (total, obtained, or free text).
     """
-    # Buscar el indicador
-    stmt = select(IndicatorModel).where(IndicatorModel.id == indicator_id)
-    indicator = db.execute(stmt).scalars().first()
-
+    indicator = db.get(IndicatorModel, indicator_id)
     if not indicator:
         raise HTTPException(status_code=404, detail=f"Indicator with ID {indicator_id} not found")
 
-    # 2. Preparar datos: Convierte Pydantic a diccionario, excluyendo los campos que son None
     update_data = data.model_dump(exclude_none=True) 
-
-    # 3. Aplicar las actualizaciones
     for key, value in update_data.items():
         setattr(indicator, key, value) 
 
-    # 4. Guardar los cambios
     try:
         db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error during update: {e}")
 
-    return
+    return Response(status_code=204)
+
 
 # ====================
 # EVIDENCIAS
 # ====================
 
 @app.post("/indicators/{indicator_id}/evidences", response_model=Evidence, status_code=201)
-def upload_evidence(indicator_id: int, file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db)):
-    """Stream-save an uploaded file to disk with size/type checks and register an Evidence row."""
+def upload_evidence(indicator_id: int, file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db), user: "UserModel" = Depends(require_role("editor"))):
+    """Upload an evidence file and link it to an Indicator."""
     ind = db.get(IndicatorModel, indicator_id)
     if not ind:
         raise HTTPException(status_code=404, detail="Indicator not found")
+    
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTS:
         raise HTTPException(status_code=415, detail=f"Unsupported file type '{ext}'")
+    
     filename = f"{uuid.uuid4()}{ext}"
     dest = UPLOAD_DIR / filename
     bytes_written = 0
+    
+    # Stream-save file
     with dest.open("wb") as buffer:
         while True:
             chunk = file.file.read(COPY_CHUNK_SIZE)
@@ -1023,6 +1022,8 @@ def upload_evidence(indicator_id: int, file: UploadFile = File(...), description
                 dest.unlink(missing_ok=True)
                 raise HTTPException(status_code=413, detail="File too large")
             buffer.write(chunk)
+    
+    # Create DB record
     m = EvidenceModel(
         indicator_id=indicator_id,
         description=description,
@@ -1035,7 +1036,7 @@ def upload_evidence(indicator_id: int, file: UploadFile = File(...), description
     return evidence_to_pydantic(m)
 
 @app.post("/plans/{plan_id}/evidences", response_model=Evidence, status_code=201)
-def upload_plan_evidence(plan_id: int, file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db)):
+def upload_plan_evidence(plan_id: int, file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db), user: "UserModel" = Depends(require_role("editor"))):
     plan = db.get(StrategicPlanModel, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -1056,7 +1057,7 @@ def upload_plan_evidence(plan_id: int, file: UploadFile = File(...), description
                 raise HTTPException(status_code=413, detail="File too large")
             buffer.write(chunk)
     m = EvidenceModel(
-        plan_id=plan_id,
+        plan_id=plan_id, 
         description=description,
         filename=filename,
         original_filename=file.filename,
@@ -1065,7 +1066,6 @@ def upload_plan_evidence(plan_id: int, file: UploadFile = File(...), description
     db.add(m)
     db.flush()
     return evidence_to_pydantic(m)
-
 
 @app.get("/indicators/{indicator_id}/evidences", response_model=List[Evidence])
 def list_evidences(indicator_id: int, skip: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db)):
@@ -1093,7 +1093,7 @@ def list_plan_evidences(plan_id: int, skip: int = Query(0, ge=0), limit: int = Q
     return [evidence_to_pydantic(e) for e in evs]
 
 @app.delete("/evidences/{evidence_id}", status_code=204)
-def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
+def delete_evidence(evidence_id: int, db: Session = Depends(get_db), user: "UserModel" = Depends(require_role("editor"))):
     """Delete an evidence row and remove the physical file if present."""
     m = db.get(EvidenceModel, evidence_id)
     if not m:
@@ -1103,7 +1103,7 @@ def delete_evidence(evidence_id: int, db: Session = Depends(get_db)):
     try:
         (UPLOAD_DIR / filename).unlink(missing_ok=True)
     except Exception:
-        pass
+        pass 
     return Response(status_code=204)
 
 # Descarga directa del archivo subido
@@ -1394,12 +1394,10 @@ def get_stats_totals(
     db: Session = Depends(get_db),
     user = Depends (get_current_user)
     ):
-
     """
     Obtiene los conteos totales para los indicadores, metas,
     actividades (planes) y la suma de recursos para el dashboard.
     """
-
     total_indicadores = db.execute(
         select(func.count(IndicatorModel.id))
     ).scalar() or 0
@@ -1422,7 +1420,26 @@ def get_stats_totals(
         actividades=total_actividades,
         recursos=total_recursos
     )
-    
+
+@app.get("/stats/resources-by-dimension")
+def get_resources_by_dimension(db: Session = Depends(get_db), user = Depends(get_current_user)):
+    """
+    Retorna la suma total de 'monto_total' por dimensión.
+    """
+    results = (
+        db.query(
+            StrategicPlanModel.dimension,
+            func.sum(StrategicResourceModel.monto_total)
+        )
+        .join(StrategicResourceModel, StrategicPlanModel.id == StrategicResourceModel.plan_id)
+        .group_by(StrategicPlanModel.dimension)
+        .all()
+    )
+
+    return [
+        {"dimension": r[0], "total": r[1] or 0}
+        for r in results
+    ]
 
 # Health
 @app.get("/health")

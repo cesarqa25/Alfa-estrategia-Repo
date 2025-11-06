@@ -1,0 +1,42 @@
+IMPORTANTE!!!!!!!!!!!
+-agregue en la carpeta Imagenes-iconos-extra nuevas imágenes.
+
+-class RoleEnum EDITADO.
+
+-las rutas les sale mejor cambiarlas todas y/o agregar:
+#OBJETIVOS.
+#GOALS.
+#INDICADORES.
+#EVIDENCIAS.
+#Strategic Plans API (plans + resources + strategic goals).
+#STATS TOTALES (DASHBOARD).
+A EXCEPCIÓN DEL #LOGIN.
+
+-tengan ojo sino les puedes fallar tanto el login como el dashboard.
+------------------------------------------------------------------------
+-Cambiar el archivo entero de styles_dashboard.CSS.
+
+-Cambiar styles.css(si no cambiaron el login) + Login.js(revisar bien que tienen que agregar, no copien todo) + login.html.
+
+-app_dashboard.js (pueden cambiar el archivo entero si quieren):
+ -linea 83-120 NUEVO.
+ -linea 128-259 NUEVO.
+ -function canEditProgress() NUEVO.
+ -async function apiFetch EDITADO.
+ -async function apiListObjectives EDITADO.
+ -async function apiCreateObjective EDITADO.
+ -async function apiListGoalsByObjective EDITADO.
+ -async function apiCreateGoal EDITADO.
+ -async function apiCreateIndicator EDITADO.
+ -async function getPlansByDimension EDITADO.
+ -async function showDashboard EDITADO.
+ -async function showPlanList EDITADO.
+ -async function showEvidenceUpload EDITADO.
+ -async function showIndicatorsForGoal EDITADO.
+ -async function showStrategicGoalsEditor EDITADO.
+ -async function router EDITADO.
+ -creo que lo de // App bootstrapping igual edite algo pero no recuerdo que era, tengan ojo.
+
+
+
+
