@@ -581,7 +581,7 @@ async function showDashboard() {
       </article>
 
       <article class="card">
-        <header class="card__header"><h2>Recuento de Planes Estratégicos por Dimensión</h2></header>
+        <header class="card__header"><h2>Recuento de Objetivos Estratégicos por Dimensión</h2></header>
         <div class="card__body">
           <div id="objetivosBars" class="v-bars"></div>
         </div>
@@ -2010,7 +2010,9 @@ window.addEventListener('DOMContentLoaded', () => {
   router(); 
 });
 window.addEventListener('DOMContentLoaded', setupAccordionTransition);
-
+window.apiFetch = apiFetch;
+window.formatoMoneda = formatoMoneda;
+window.ensureObjectiveByName = ensureObjectiveByName;
 
 document.getElementById('nav-dashboard')?.addEventListener('click', e => { e.preventDefault(); location.hash = '#/dashboard'; });
 document.getElementById('nav-plan-form')?.addEventListener('click', e => { e.preventDefault(); location.hash = '#/planes/form'; });

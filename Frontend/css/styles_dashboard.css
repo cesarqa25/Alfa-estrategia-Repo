@@ -405,7 +405,6 @@ content: '▾';
   scrollbar-gutter: stable both-edges;
 }
 
-
 .plan-table{
   position: sticky;
   left: 0;
@@ -847,4 +846,3 @@ textarea.inp{ resize: vertical; min-height: 56px; line-height: 1.35; }
   color: #6b7280;
   margin-left: 4px;
 }
- 

@@ -10,22 +10,21 @@ export function initPlanForm() {
 
   const $form = document.getElementById("planForm");
   const $msg  = document.getElementById("plansMsg");
-// fuerza colegio único
+
+  // fuerza colegio único
   const schoolEl = document.getElementById("p_school");
   if (schoolEl) {
     if (schoolEl.tagName === "SELECT") {
       schoolEl.innerHTML = `<option value="${SCHOOL}">${SCHOOL}</option>`;
-      schoolEl.disabled = false;        // si quieres mostrarlo activo
+      schoolEl.disabled = false;
     } else {
       schoolEl.value = SCHOOL;
-      schoolEl.readOnly = true;         // si es <input>
+      schoolEl.readOnly = true;
     }
   }
   if (!$form) return;
 
-  // -------------------------------
   // 1) Cargar select de dimensiones
-  // -------------------------------
   (async () => {
     const sel = document.getElementById("p_dimension");
     if (!sel) return;
@@ -40,14 +39,7 @@ export function initPlanForm() {
     }
   })();
 
-  // -----------------------------------------
-  // 2) Helpers para la sección de RECURSOS
-  //    (IDs esperados en el HTML: ver comentario)
-  // -----------------------------------------
-  // Espera los campos:
-  // r_need, r_ate, r_tic, r_planes, r_medios,
-  // r_subv_gen, r_sep, r_pie, r_eib, r_mant, r_proret, r_internado, r_reforz,
-  // r_faep, r_aporte_mun, r_total
+  // 2) Helpers para RECURSOS
   const $rTotal = document.getElementById('r_total');
 
   const num = (id) => {
@@ -71,13 +63,10 @@ export function initPlanForm() {
     ids.forEach(id => document.getElementById(id)?.addEventListener('input', calc));
     calc();
   }
-  // Inicializa auto-total solo si existe la sección
   if ($rTotal) setUpAutoTotal();
 
   function collectResourcePayload() {
-    // Si no hay bloque de recursos en el HTML, no enviamos nada
     if (!$rTotal) return null;
-
     const payload = {
       recursos_necesarios: txt('r_need'),
       ate: txt('r_ate'),
@@ -96,28 +85,17 @@ export function initPlanForm() {
       monto_aporte_municipal: num('r_aporte_mun'),
       monto_total: num('r_total'),
     };
-
-    // ¿Hay algo realmente informado?
-    const anyText =
-      payload.recursos_necesarios || payload.ate || payload.tic ||
-      payload.planes || payload.medios_verificacion;
-    const anyMonto =
-      payload.monto_subvencion_general || payload.monto_sep || payload.monto_pie ||
-      payload.monto_eib || payload.monto_mantenimiento || payload.monto_pro_retencion ||
-      payload.monto_internado || payload.monto_reforzamiento || payload.monto_faep ||
-      payload.monto_aporte_municipal;
+    const anyText = payload.recursos_necesarios || payload.ate || payload.tic || payload.planes || payload.medios_verificacion;
+    const anyMonto = payload.monto_subvencion_general || payload.monto_sep || payload.monto_pie || payload.monto_eib || payload.monto_mantenimiento || payload.monto_pro_retencion || payload.monto_internado || payload.monto_reforzamiento || payload.monto_faep || payload.monto_aporte_municipal;
 
     return (anyText || anyMonto) ? payload : null;
   }
 
-  // -----------------------------------------
-  // 3) Submit: crea PLAN y luego (opcional) RECURSOS
-  // -----------------------------------------
+  // 3) Submit
   $form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if ($msg) { $msg.textContent = ""; $msg.className = "msg"; }
+    if ($msg) { $msg.textContent = "Guardando..."; $msg.className = "msg"; }
 
-    // --- IMPORTANTE: nombres en ESPAÑOL como en el backend ---
     const payload = {
       dimension:            document.getElementById("p_dimension")?.value || "",
       colegio:              SCHOOL,
@@ -132,7 +110,6 @@ export function initPlanForm() {
       responsable:          document.getElementById("p_resp")?.value.trim() || "",
     };
 
-    // Valida obligatorios
     const faltan = [];
     if (!payload.dimension)            faltan.push("Dimensión");
     if (!payload.colegio)              faltan.push("Colegio");
@@ -149,6 +126,13 @@ export function initPlanForm() {
     }
 
     try {
+      if (typeof window.ensureObjectiveByName === 'function') {
+          await window.ensureObjectiveByName(payload.dimension, payload.objetivo_estrategico);
+      } else {
+          console.warn("Advertencia: 'window.ensureObjectiveByName' no está disponible. El contador de Objetivos podría no actualizarse al instante.");
+      }
+
+
       // 1) Crear el plan
       const res = await fetch(`${API}/plans`, {
         method: "POST",
@@ -172,30 +156,28 @@ export function initPlanForm() {
       const created = await res.json();          
       const planId  = created.id;
 
-      // 2) Si hay recursos, crearlos ligados al plan
+      // 2) Si hay recursos, crearlos
       const resPayload = collectResourcePayload();
       if (resPayload) {
         await fetch(`${API}/plans/${planId}/resources`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify(resPayload)
-        }).catch(() => {
-          // No interrumpimos si falla recursos; solo avisamos por consola
-          console.warn("No se pudieron guardar los recursos");
-        });
+        }).catch(e => console.warn("Error guardando recursos", e));
       }
 
       if ($msg) {
-        $msg.textContent = "Guardado correctamente";
+        $msg.textContent = "Plan guardado correctamente";
         $msg.className = "msg msg--ok";
       }
       $form.reset();
-      // Recalcula total 
       if ($rTotal) setUpAutoTotal();
+      // Restaurar colegio por si el reset lo borró
+      if (schoolEl && schoolEl.tagName !== "SELECT") schoolEl.value = SCHOOL;
 
     } catch (err) {
       if ($msg) {
-        $msg.textContent = "Error de red";
+        $msg.textContent = "Error de red o servidor: " + err.message;
         $msg.className = "msg msg--error";
       }
       console.error(err);

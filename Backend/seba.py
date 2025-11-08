@@ -209,7 +209,7 @@ COPY_CHUNK_SIZE = 1024 * 1024        # 1 MB
 class ObjectiveModel(Base):
     __tablename__ = "objectives"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(Text, nullable=False)
+    name = Column(String(300), nullable=False)
     description = Column(String(1024), nullable=True)
     start_year = Column(Integer, nullable=False)
     end_year = Column(Integer, nullable=False)

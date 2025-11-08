@@ -7,10 +7,6 @@ const $toggle   = document.getElementById('ShowPassword')
 const $statusBar = document.getElementById('progressBar');
 const $statusIcon = document.getElementById('statusIcon');
 
-/**
- * @param {('loading'|'success'|'error'|'initial')} state
- * @param {string} iconText 
- */
 
 function updateStatus(state, iconText = '') {
     $statusBar.className = 'progress-bar';
