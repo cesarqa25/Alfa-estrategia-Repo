@@ -136,53 +136,61 @@ function pintarStatsGlobales(s) {
 // --- FUNCIONES DE GRÁFICOS (SIN HOVER) ---
 function pintarDonutDimension(containerId, items) {
   const cont = document.getElementById(containerId);
-  if (!cont) return;
+  if (!cont || !items) return;
   cont.className = 'donut-container';
   const chartEl = document.createElement('div');
   chartEl.className = 'donut-chart';
   const labelEL = document.createElement('ul');
   labelEL.className = 'donut-label';
-  let currentDegree = 0;
-  let gradientString = 'conic-gradient(from 270deg, ';
-  
-  items.forEach((item, index) => {
-    const color = DIMENSION_COLORS[item.etiqueta] || '#ccc';
-    // 'percent' es el tamaño del quesito
-    const segmentDegree = (item.percent / 100) * 360; 
-    const endDegree = currentDegree + segmentDegree;
 
-    gradientString += `${color} ${currentDegree}deg ${endDegree}deg`;
-    if (index < items.length - 1) {
-      gradientString += ', ';
+  const segments = [];
+  let currentDegree = 0;
+  const totalItems = items.length;
+  const gradosPorItem = 360 / totalItems; // cada dimension tiene un 25% del donut (90°)
+
+  items.forEach((item, index) => {
+    const color = DIMENSION_COLORS[item.etiqueta] || '#ccc';
+    const valorProgreso = (item.valor !== undefined) ? item.valor : (item.percent || 0);
+
+    const gradosLlenos = (valorProgreso / 100) * gradosPorItem;
+    const gradosVacios = gradosPorItem - gradosLlenos;
+
+    const inicioCuadrante = currentDegree;
+    const finLleno = inicioCuadrante + gradosLlenos;
+    const finCuadrante = inicioCuadrante + gradosPorItem;
+
+    if (gradosLlenos > 0.01) {
+        segments.push(`${color} ${inicioCuadrante}deg ${finLleno}deg`);
     }
+    if (gradosVacios > 0.01) {
+        segments.push(`var(--ring-bg) ${finLleno}deg ${finCuadrante}deg`);
+    }
+    currentDegree = finCuadrante;
 
-    const li = document.createElement('li');
-    li.className = 'label__item';
-    const colorSwatch = document.createElement('span');
-    colorSwatch.className = 'label__color';
-    colorSwatch.style.backgroundColor = color;
-    const text = document.createElement('span');
-    // 'valor' es el número que se muestra (avance Promedio)
-    const valorMostrar = (item.valor !== undefined) ? item.valor : item.percent;
-    text.textContent = `${item.etiqueta} (${valorMostrar.toFixed(2)}%)`; 
-    li.appendChild(colorSwatch);
-    li.appendChild(text);
-    labelEL.appendChild(li);
+    const li = document.createElement('li');
+    li.className = 'label__item';
+    const colorSwatch = document.createElement('span');
+    colorSwatch.className = 'label__color';
+    colorSwatch.style.backgroundColor = color;
+    const text = document.createElement('span');
+    text.textContent = `${item.etiqueta} (${valorProgreso.toFixed(2)}%)`; 
+    li.appendChild(colorSwatch);
+    li.appendChild(text);
+    labelEL.appendChild(li);
+  });
 
-    currentDegree = endDegree;
-  });
-
-  gradientString += ')';
-  if (currentDegree > 0.1) { 
+  if (segments.length > 0) {
+      let gradientString = `conic-gradient(from 360deg, ${segments.join(', ')})`;
       chartEl.style.background = gradientString;
   } else {
       chartEl.style.background = 'var(--ring-bg)';
   }
 
-  cont.innerHTML = '';
-  cont.appendChild(chartEl);
-  cont.appendChild(labelEL);
+  cont.innerHTML = '';
+  cont.appendChild(chartEl);
+  cont.appendChild(labelEL);
 }
+
 
 /** Renderiza barras horizontales de recursos. */
 function pintarBarrasHorizontales(containerId, items, formatValue) {
@@ -322,6 +330,7 @@ function canEditProgress() {
 
 // --- Generic SPA + API helpers ----------------------------------------------
 const API = "http://127.0.0.1:8000";
+try {window.API = API;} catch {} 
 const $view = document.getElementById('view');
 const $title = document.getElementById('pageTitle');
 
@@ -537,6 +546,24 @@ function showForbidden(msg = 'No tienes permisos para acceder a esta sección.')
 const plansCache = new Map();
 window.invalidatePlansCache = (dim) => dim ? plansCache.delete(dim) : plansCache.clear();
 
+// This ensures the refresh works even after the view is re-rendered.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('#btnRefrescar');
+  if (!btn) return;
+  const dimEncoded = btn.dataset.dim;
+  if (!dimEncoded) return;
+  const dim = decodeURIComponent(dimEncoded);
+  try {
+    plansCache.delete(dim);
+    console.log(`Caché de ${dim} eliminada (delegated). Forzando recarga.`);
+  } catch (err) {
+    console.warn('No se pudo borrar la caché de planes:', err);
+  }
+  // showPlanList is a function declaration (hoisted) so it's safe to call here
+  if (typeof showPlanList === 'function') showPlanList(dim);
+});
+
+
 /** Agrupa planes por objetivo dentro de una dimensión (con memoización). */
 async function getPlansByDimension(dimensionValue) {
   if (plansCache.has(dimensionValue)) return plansCache.get(dimensionValue);
@@ -639,8 +666,9 @@ async function showDashboard() {
   });
 
   avanceData.forEach(item => {
-    item.percent = totalPromedio > 0 ? (item.valor / totalPromedio) * 100 : 0;
-  }); 
+    item.percent = item.valor; 
+    item.valor = item.valor !== undefined ? item.valor : 0;
+});
   const avanceOrdenado = ordenarDatosPorDimension(avanceData);
   pintarDonutDimension('donutDimensionContainer', avanceOrdenado);
 
@@ -708,7 +736,7 @@ async function showPlanList(dimensionValue) {
     <section class="card card--full">
       <header class="card__header" style="display:flex;justify-content:space-between;align-items:center;">
         <h2 style="margin:0;">${tituloDimension(dimensionValue)}</h2>
-        <button id="btnRefrescar" class="btn">Refrescar</button>
+        <button id="btnRefrescar" class="btn" data-dim="${encodeURIComponent(dimensionValue)}">Refrescar</button>
       </header>
       <div class="card__body" id="plansList">Cargando…</div>
     </section>
@@ -948,23 +976,24 @@ async function showObjectiveDetail(dimensionValue, objetivo) {
 
       <div class="card__body">
         <div class="table-wrap">
-          <table class="plan-table">
-            <thead>
-              <tr>
-                <th>Colegio</th>
-                <th>Estrategia</th>
-                <th>Subdimensiones</th>
-                <th>Acción</th>
-                <th>Descripción</th>
-                <th>Inicio</th>
-                <th>Término</th>
-                <th>Programa</th>
-                <th>Responsable</th>
-              </tr>
-            </thead>
-            <tbody id="plansTableBody"><tr><td colspan="10">Cargando acciones...</td></tr></tbody>
-          </table>
-        </div>
+          <div class ="hscroll">
+            <table class="plan-table">
+              <thead>
+                <tr>
+                  <th>Colegio</th>
+                  <th>Estrategia</th>
+                  <th>Subdimensiones</th>
+                  <th>Acción</th>
+                  <th>Descripción</th>
+                  <th>Inicio</th>
+                  <th>Término</th>
+                  <th>Programa</th>
+                  <th>Responsable</th>
+                </tr>
+              </thead>
+              <tbody id="plansTableBody"><tr><td colspan="10">Cargando acciones...</td></tr></tbody>
+            </table>
+          </div>
       </div>
     </section>
   `;
@@ -1065,6 +1094,7 @@ async function apiUploadEvidenceByPlan(planId, file, description = "") {
     document.getElementById('plan-ev-uploader').style.display = canEdit ? 'flex' : 'none';
     refresh();
   });
+
   document.getElementById('plan-ev-close').addEventListener('click', () => {
     document.getElementById('plan-ev-modal').style.display = 'none';
     CURRENT_PLAN = null;
@@ -1449,9 +1479,29 @@ async function showIndicatorsForGoal(goalId) {
       }
 
       progresses.push(avancePct);
-
       const avanceWidth = avancePct.toFixed(1);
-      const barColor = avancePct >= 100 ? '#28a745' : '#007bff';
+      const metaNumerica = parseFloat(x.target);
+      let barColor = '';
+
+      if (!isNaN(metaNumerica) && metaNumerica > 0) {
+
+        if (avancePct >= metaNumerica) {
+          barColor = 'var(--ok)';
+        } else if (avancePct >= (metaNumerica / 2)) { 
+          barColor = 'var(--warn)';
+        } else {
+          barColor = 'var(--danger)'; 
+        }
+
+      } else {
+        if (avancePct >= 75) {
+          barColor = 'var(--ok)';
+        } else if (avancePct >= 50) {
+          barColor = 'var(--warn)';
+        } else {
+          barColor = 'var(--danger)'; 
+        }
+      }
 
       return `
         <tr data-id="${x.id}" data-kind="${kind}" style="vertical-align: middle;">
@@ -1970,24 +2020,24 @@ async function router() {
     const mEvi = hash.match(/^#\/evidencias\/([^/]+)\/(.+)$/);
 
     if (mEvi) { 
-      await showEvidenceUpload(decodeURIComponent(mEvi[1]), decodeURIComponent(mEvi[2])); 
+       showEvidenceUpload(decodeURIComponent(mEvi[1]), decodeURIComponent(mEvi[2])); 
       return; 
     }
 
-    if (mGoal)   { await showIndicatorsForGoal(decodeURIComponent(mGoal[1])); return; }
+    if (mGoal)   { showIndicatorsForGoal(decodeURIComponent(mGoal[1])); return; }
 
     const mMetas = hash.match(/^#\/metas\/([^/]+)\/(.+)$/);
-    if (mMetas)  { await showStrategicGoalsEditor(decodeURIComponent(mMetas[1]), decodeURIComponent(mMetas[2])); return; }
+    if (mMetas)  { showStrategicGoalsEditor(decodeURIComponent(mMetas[1]), decodeURIComponent(mMetas[2])); return; }
 
-    if (hash === '#/dashboard')          return await showDashboard(); // CAMBIO: 'await'
-    if (hash === '#/reportes')           return await showReportes();
-    if (hash === '#/planes/form')        return isEditor() ? await showPlanForm() : showForbidden('Solo los editores pueden crear/editar planes.');
-    if (hash === '#/planes/liderazgo')   return await showPlanList('LIDERAZGO');
-    if (hash === '#/planes/gestion')     return await showPlanList('GESTION_PEDAGOGICA');
-    if (hash === '#/planes/convivencia') return await showPlanList('CONVIVENCIA_ESCOLAR');
-    if (hash === '#/planes/recursos')    return await showPlanList('GESTION_RECURSOS');
+    if (hash === '#/dashboard')          return showDashboard(); 
+    if (hash === '#/reportes')           return showReportes();
+    if (hash === '#/planes/form')        return isEditor() ?  showPlanForm() : showForbidden('Solo los editores pueden crear/editar planes.');
+    if (hash === '#/planes/liderazgo')   return showPlanList('LIDERAZGO');
+    if (hash === '#/planes/gestion')     return showPlanList('GESTION_PEDAGOGICA');
+    if (hash === '#/planes/convivencia') return showPlanList('CONVIVENCIA_ESCOLAR');
+    if (hash === '#/planes/recursos')    return showPlanList('GESTION_RECURSOS');
 
-    return await showDashboard(); 
+    return showDashboard(); 
   } catch (e) {
       // Si algo falla (ej. 401 de apiFetch)
       console.error("Error en el router:", e);
@@ -2010,9 +2060,10 @@ window.addEventListener('DOMContentLoaded', () => {
   router(); 
 });
 window.addEventListener('DOMContentLoaded', setupAccordionTransition);
-window.apiFetch = apiFetch;
-window.formatoMoneda = formatoMoneda;
-window.ensureObjectiveByName = ensureObjectiveByName;
+
+window.apiFetch = apiFetch; // Expose for debugging
+window.formatoMoneda = formatoMoneda; // Expose for debugging
+window.ensureObjectiveByName = ensureObjectiveByName; // Expose for debugging
 
 document.getElementById('nav-dashboard')?.addEventListener('click', e => { e.preventDefault(); location.hash = '#/dashboard'; });
 document.getElementById('nav-plan-form')?.addEventListener('click', e => { e.preventDefault(); location.hash = '#/planes/form'; });
