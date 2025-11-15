@@ -7,8 +7,15 @@ export async function showReportesView($view, $title, esc) {
       };
   const tituloDimension = (X) => nombresDimensiones[X] || X.replace(/_/g, ' ');
 
-  $title.textContent = "Generador de Reportes";
+  $title.textContent = "";
   $view.innerHTML = `
+    <header class="dashboard-header card">
+        <div class="header-text">
+            <h1>Generador de Reportes</h1>
+            <p>Reportes de cada objetivo estrategico</p>
+        </div>
+    </header>
+
     <section class="card card--full">
       <header class="card__header">
         <h2 style="margin:0;">Selecciona un Objetivo</h2>
@@ -171,9 +178,16 @@ export async function showReportesView($view, $title, esc) {
   }
 
   function renderFinalReport(obj, goals, plans, objProgress, totalIndicadores, totalRecursos, fmtMoney) {
-      $title.textContent = "Reporte Consolidado";
+      $title.textContent = "";
       
       $view.innerHTML = `
+        <header class="dashboard-header card">
+          <div class="header-text">
+              <h1>Reporte Consolidado</h1>
+              <p>Informe completo del objetivo estratégico escogido</p>
+          </div>
+        </header>
+
         <section class="card card--full reportes-container">
           <header class="card__header" style="display:flex;justify-content:space-between;align-items:center; flex-wrap:wrap; gap:10px;">
             <button id="btnVolverRep" class="btn btn--ghost">← Volver al selector</button>
