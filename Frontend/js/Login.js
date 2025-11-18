@@ -27,9 +27,11 @@ function updateStatus(state, iconText = '') {
         case 'error':
             $statusBar.classList.add('progress-bar--error');
             $statusIcon.classList.add('status-icon--error');
+
+            const container = document.querySelector('.contenedor');
+            container.classList.add('shake-animation');
+            setTimeout(() =>{ container.classList.remove('shake-animation')}, 450);
             setTimeout(() => { $statusIcon.style.opacity = '1'; }, 700); 
-        case 'initial':
-        default:
             break;
     }
 }
@@ -80,4 +82,13 @@ form.addEventListener('submit', async (e) => {
   } finally {
       setTimeout(() => { $submit.disabled = false; }, 1200);
   }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.querySelector('.contenedor');
+    
+    // Esperamos lo que dura la animación (800ms) y quitamos la clase
+    setTimeout(() => {
+        container.classList.remove('entrada-suave');
+    }, 1000); // Le damos 1000ms (1s) para estar seguros
 });

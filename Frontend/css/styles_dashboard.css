@@ -86,6 +86,8 @@ body {
   border-radius: .5px;
   height: 100vh;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .brand {
@@ -106,7 +108,7 @@ body {
 .brand__title { font-weight: 700; font-size: 12px; letter-spacing: .4px; }
 .brand__subtitle { font-size: 11px; opacity: .9; }
 
-.nav { margin-top: 8px;}
+.nav { margin-top: 8px; flex-grow: 1;}
 .nav__section {
   border-top: 1px solid #aaa;
   margin: 20px px;
@@ -481,7 +483,6 @@ content: '▾';
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  scrollbar-gutter: stable both-edges;
 }
 
 
@@ -1014,7 +1015,6 @@ textarea.inp{ resize: vertical; min-height: 56px; line-height: 1.35; }
   margin-bottom: 1rem;
   text-transform: uppercase;
   font-size: 1rem;
-  border-bottom: 2px solid #eef2f7; 
   padding-bottom: 0.5rem;
 }
 
@@ -1073,4 +1073,439 @@ textarea.inp{ resize: vertical; min-height: 56px; line-height: 1.35; }
 
 .btn-gen:hover span:last-child {
   transform: translateX(5px); 
+}
+
+/* ==============================================================================================
+                                  CONFIG MODO OSCURO
+   ==============================================================================================       
+*/
+
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --ring-bg: #334155;
+  --border-color: #334155;
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  --input-bg: #0f172a; 
+}
+
+/* Fondo general de la página */
+[data-theme="dark"] body {
+  background: var(--bg);
+}
+
+/* Barra Lateral (Aside) y Barra Superior (.container)*/
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .container {
+  background: linear-gradient(180deg, #1e293b, #0f172a) !important;
+  border-right: 1px solid #334155; 
+  border-bottom: 1px solid #334155;
+}
+
+/* Tarjetas y Paneles */
+[data-theme="dark"] .card, 
+[data-theme="dark"] .dashboard-header,
+[data-theme="dark"] .section-card,
+[data-theme="dark"] .btn-gen {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid #334155; 
+}
+
+/* Inputs y Selects */
+[data-theme="dark"] .smart-form .field > input,
+[data-theme="dark"] .smart-form .field > select,
+[data-theme="dark"] .smart-form .field > textarea,
+[data-theme="dark"] #inpMeta,
+[data-theme="dark"] #inpEstrategiaPeriodo,
+[data-theme="dark"] .inp {
+  background-color: #0f172a;
+  border-color: #475569;
+  color: white;
+}
+
+/* Tablas */
+[data-theme="dark"] .plan-table thead th {
+  background-color: #111827;
+  color: #e2e8f0;
+  border-bottom: 1px solid #374151;
+}
+[data-theme="dark"] .plan-table tbody tr {
+  background-color: var(--surface);
+  border-bottom: 1px solid #374151;
+}
+[data-theme="dark"] .plan-table tbody tr:hover {
+  background-color: #334155;
+}
+[data-theme="dark"] .plan-table td {
+  color: #cbd5e1;
+  border-right: 1px solid #374151;
+}
+
+[data-theme="dark"] .nav__item {
+  color: #e2e8f0;
+}
+[data-theme="dark"] .nav__item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+[data-theme="dark"] .smart-form .field > input,
+[data-theme="dark"] .smart-form .field > select,
+[data-theme="dark"] .smart-form .field > textarea,
+[data-theme="dark"] #inpMeta,
+[data-theme="dark"] #inpEstrategiaPeriodo,
+[data-theme="dark"] .inp {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: white;
+}
+
+[data-theme="dark"] .prog-box {
+  background-color: #0f172a;
+  border-color: #334155;
+}
+
+/* Texto de montos en tablas */
+[data-theme="dark"] .plan-table td.money {
+    color: #cbd5e1; 
+}
+
+/* "Avance Global planes estratégicos" */
+[data-theme="dark"] .stats li {
+    background-color: #0f172a; 
+    border: 1px solid #334155; 
+    color: var(--text);
+}
+[data-theme="dark"] .stats span {
+    color: #cbd5e1; 
+    font-weight: 500;
+}
+
+/* --- Donut leyendas  --- */
+
+/* Ítem seleccionado (Activo) */
+[data-theme="dark"] .donut-label .label__item.is-active {
+  background-color: #334155 !important; 
+  color: #ffffff !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Hover sobre los ítems no seleccionados */
+[data-theme="dark"] .donut-label .label__item:hover {
+  background-color: rgba(255, 255, 255, 0.05); 
+}
+
+/* El botón "Ver todos los datos"*/
+[data-theme="dark"] .label__item.is-reset {
+    border-bottom: 1px dashed #475569;
+    color: #94a3b8;
+}
+[data-theme="dark"] .label__item.is-reset:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--primary);
+}
+
+
+/* =========================================================
+            LISTA DE OBJETIVOS (Dark Mode) 
+   =========================================================          
+*/
+
+/* El contenedor del ítem (Línea) */
+[data-theme="dark"] .obj-item {
+  border-bottom: 1px solid #334155; 
+}
+
+/* El Título del objetivo */
+[data-theme="dark"] .obj-item__title {
+  color: #f1f5f9;
+}
+
+/* El número de la lista  */
+[data-theme="dark"] .obj-item__num {
+  color: var(--primary); 
+  font-weight: 800;
+}
+
+/* El texto de "X acción(es)" */
+[data-theme="dark"] .obj-item__meta {
+  color: #94a3b8; 
+}
+
+/* Anillo de los planes estratégicos*/
+[data-theme="dark"] .ring-small {
+  background: 
+    radial-gradient(closest-side, var(--surface) 79%, transparent 80% 100%),
+    conic-gradient(var(--fill-color) calc(var(--value) * 1%), var(--ring-bg) 0);
+}
+
+[data-theme="dark"] .ring__inside-small { background-color: var(--surface); }
+[data-theme="dark"] .ring__value-small {
+  color: #ffffff; 
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+
+/* Botón/es eliminar */
+[data-theme="dark"] .btnEliminar {
+  background-color: #334155; 
+  border: 1px solid #475569;
+}
+
+[data-theme="dark"] .btnEliminar:hover {
+  background-color: #ef4444; /* Rojo al pasar el mouse (opcional, para alerta) */
+  border-color: #ef4444;
+}
+
+/* Invertir el color del icono (imagen png)*/
+[data-theme="dark"] .btnEliminar img {
+  filter: invert(1) brightness(2); 
+}
+
+[data-theme="dark"] .obj-item__actions .btn--ghost {
+  color: #cbd5e1;
+  border-color: #475569;
+}
+[data-theme="dark"] .obj-item__actions .btn--ghost:hover {
+  background-color: #334155;
+  color: #fff;
+}
+
+
+/* Modificamos el filtro para la imagen PNG */
+[data-theme="dark"] .btnEliminar img {
+  filter: brightness(0) invert(1); 
+  width: 18px; 
+  height: 18px; 
+}
+
+/* El borde exterior de toda la tabla (el marco) */
+[data-theme="dark"] .plan-table {
+  border: 1px solid #334155;
+  background-color: #1e293b;
+}
+
+/* Las celdas de thead */
+[data-theme="dark"] .plan-table thead th {
+  background-color: #0f172a; /* Un poco más oscuro que el cuerpo para diferenciar */
+  color: #e2e8f0;            /* Texto casi blanco */
+  border-bottom: 2px solid #334155; /* Línea separadora horizontal */
+  border-right: 1px solid #334155;  /* Línea separadora vertical sutil */
+}
+
+/* Celdas del tbody */
+[data-theme="dark"] .plan-table tbody td {
+  color: #cbd5e1;
+  border-bottom: 1px solid #334155; 
+  border-right: 1px solid #1e293b; 
+}
+
+/* Hover en las filas */
+[data-theme="dark"] .plan-table tbody tr:hover {
+  background-color: #334155;
+}
+
+[data-theme="dark"] .plan-table th:last-child,
+[data-theme="dark"] .plan-table td:last-child {
+  border-right: none;
+}
+
+
+/* =========================================================
+          VISTA DE INDICADORES (MODO OSCURO) 
+   =========================================================          
+*/
+
+/* Nombre, Unidad, Target */
+[data-theme="dark"] #indNombre, 
+[data-theme="dark"] #indUnidad, 
+[data-theme="dark"] #indTarget {
+    background-color: #0f172a !important; 
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+/* Labels del formulario */
+[data-theme="dark"] .lbl {
+    color: #cbd5e1 !important;
+}
+
+/* Caja de Progreso */
+[data-theme="dark"] .prog-box {
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+}
+
+/* Inputs (Cantidad total / obtenida) */
+[data-theme="dark"] .prog-total,
+[data-theme="dark"] .prog-obt,
+[data-theme="dark"] .prog-free {
+    background-color: #0f172a !important; 
+    border: 1px solid #475569 !important;
+    color: #ffffff !important;
+}
+
+/* Caja de Resultado */
+[data-theme="dark"] .prog-result {
+    background-color: #0f172a !important; 
+    border: 1px dashed #475569 !important; 
+    color: #f1f5f9 !important; 
+}
+
+/* títulos dentro de la caja de progreso */
+[data-theme="dark"] .prog-grid label {
+    color: #94a3b8;
+}
+
+/* =========================================================
+          BOTÓN DÍA/NOCHE ANIMADO (Personalizado) 
+   =========================================================          
+*/
+
+/* Contenedor para reducir el tamaño del botón */
+.toggle-scale-wrapper {
+    transform: scale(0.35); /* Reducimos tamaño original */
+    transform-origin: left center; 
+    height: 80px; 
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 75px;
+    overflow: visible; 
+}
+
+.wrapper { position: relative; display: inline-block;}
+
+/* Estilo para el texto dinámico del modo */
+.mode-text {
+  margin-left: 20px;
+  font-size: 34px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3); 
+}
+
+#hide-checkbox {
+  opacity: 0;
+  height: 0;
+  width: 0;
+  position: absolute;
+}
+
+.toggle {
+  position: relative;
+  cursor: pointer;
+  display: inline-block;
+  width: 200px;
+  height: 100px;
+  background: #211042; 
+  border-radius: 50px;
+  transition: 500ms;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+.toggle-button {
+  position: absolute;
+  display: inline-block;
+  top: 7px;
+  left: 6px;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: #FAEAF1;
+  overflow: hidden;
+  box-shadow: 0 0 35px 4px rgba(255, 255, 255);
+  transition: all 500ms ease-out;
+}
+
+/* CRÁTERES (Luna) */
+.crater {
+  position: absolute;
+  display: inline-block;
+  background: #FAEAF1;
+  border-radius: 50%;
+  transition: 500ms;
+}
+
+.crater-1 { background: #FFFFF9; width: 86px; height: 86px; left: 10px; bottom: 10px; }
+.crater-2 { width: 20px; height: 20px; top: -7px; left: 44px; }
+.crater-3 { width: 16px; height: 16px; top: 20px; right: -4px; }
+.crater-4 { width: 10px; height: 10px; top: 24px; left: 30px; }
+.crater-5 { width: 15px; height: 15px; top: 40px; left: 48px; }
+.crater-6 { width: 10px; height: 10px; top: 48px; left: 20px; }
+.crater-7 { width: 12px; height: 12px; bottom: 5px; left: 35px; }
+
+/* ESTRELLAS */
+.star {
+  position: absolute;
+  display: inline-block;
+  border-radius: 50%;
+  background: #FFF;
+  box-shadow: 1px 0 2px 2px rgba(255, 255, 255);
+}
+
+.star-1 { width: 6px; height: 6px; right: 90px; bottom: 40px; }
+.star-2 { width: 8px; height: 8px; right: 70px; top: 10px; }
+.star-3 { width: 5px; height: 5px; right: 60px; bottom: 15px; }
+.star-4 { width: 3px; height: 3px; right: 40px; bottom: 50px; }
+.star-5 { width: 4px; height: 4px; right: 10px; bottom: 35px; }
+
+.star-6, .star-7, .star-8 {
+  width: 10px; height: 2px;
+  border-radius: 2px;
+  transform: rotate(-45deg);
+  box-shadow: 5px 0px 4px 1px #FFF;
+  animation-name: travel;
+  animation-duration: 1.5s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+}
+
+.star-6 { right: 30px; bottom: 30px; animation-delay: -2s; }
+.star-7 { right: 50px; bottom: 60px; }
+.star-8 { right: 90px; top: 10px; animation-delay: -4s; }
+
+@keyframes travel {
+  0% { transform: rotate(-45deg) translateX(70px); }
+  50% { transform: rotate(-45deg) translateX(-20px); box-shadow: 5px 0px 6px 1px #FFF; }
+  100% { transform: rotate(-45deg) translateX(-30px); width: 2px; height: 2px; opacity: 0; box-shadow: none; }
+}
+
+#hide-checkbox:checked + .toggle { background: #24D7F7;}
+#hide-checkbox:checked + .toggle .toggle-button {
+  background: #F7FFFF; 
+  transform: translateX(102px);
+  box-shadow: 0 0 35px 5px rgba(255, 255, 255);
+}
+
+#hide-checkbox:checked + .toggle .toggle-button .crater {
+  transform: rotate(-45deg) translateX(70px); /* Esconder cráteres */
+}
+
+#hide-checkbox:checked + .toggle .star {
+  animation: move 2s infinite;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Transformar estrellas en nubes */
+#hide-checkbox:checked + .toggle .star-1 { width: 40px; height: 10px; border-radius: 10px; background: #FFF; left: 20px; top: 25px; box-shadow: none; }
+#hide-checkbox:checked + .toggle .star-2 { width: 12px; height: 12px; background: #FFF; left: 26px; top: 23px; box-shadow: -1px 0 2px 0 rgba(0, 0 , 0, 0.1); }
+#hide-checkbox:checked + .toggle .star-3 { width: 16px; height: 16px; background: #FFF; left: 35px; top: 19px; box-shadow: -1px 0 2px 0 rgba(0, 0 , 0, 0.1); }
+#hide-checkbox:checked + .toggle .star-4 { width: 14px; height: 14px; background: #FFF; left: 46px; top: 21px; box-shadow: -1px 0 2px 0 rgba(0, 0 , 0, 0.1); }
+#hide-checkbox:checked + .toggle .star-5 { width: 60px; height: 15px; border-radius: 15px; background: #FFF; left: 30px; bottom: 20px; box-shadow: none; }
+#hide-checkbox:checked + .toggle .star-6 { width: 18px; height: 18px; background: #FFF; border-radius: 50%; left: 38px; bottom: 20px; box-shadow: -1px 0 2px 0 rgba(0, 0 , 0, 0.1); }
+#hide-checkbox:checked + .toggle .star-7 { width: 24px; height: 24px; background: #FFF; border-radius: 50%; left: 52px; bottom: 20px; box-shadow: -1px 0 2px 0 rgba(0, 0 , 0, 0.1); }
+#hide-checkbox:checked + .toggle .star-8 { width: 21px; height: 21px; background: #FFF; border-radius: 50%; left: 70px; top: 59px; box-shadow: -1px 0 2px 0 rgba(0, 0 , 0, 0.1); }
+
+@keyframes move {
+  0% { transform: none; }
+  25% { transform: translateX(2px); }
+  100% { transform: translateX(-2px); }
 }

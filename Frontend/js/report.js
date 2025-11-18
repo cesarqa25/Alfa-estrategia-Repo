@@ -1,77 +1,89 @@
-export async function showReportesView($view, $title, esc) {
-  const nombresDimensiones = {
-        "GESTION_PEDAGOGICA": "Gestión Pedagógica",
-        "CONVIVENCIA_ESCOLAR": "Convivencia Escolar",
-        "LIDERAZGO": "Liderazgo",
-        "GESTION_RECURSOS": "Gestión de Recursos"
-      };
-  const tituloDimension = (X) => nombresDimensiones[X] || X.replace(/_/g, ' ');
+/*
+  report.js
 
+  Purpose: Render the Reports view and provide utilities to generate a
+  consolidated report for a selected strategic objective.
+
+  Main responsibilities:
+  - Fetch objectives from the backend and render a dimension-grouped accordion
+    to let the user pick a specific objective.
+  - Provide keyboard and ARIA-friendly interactions for accessibility.
+  - Build the consolidated report by fetching goals, indicators, plans,
+    resources and evidences for the selected objective and render the report
+    content (tables, progress bars, evidence thumbnails, PDF export hooks).
+  - Provide a small ring/donut canvas to show objective progress.
+
+  Implementation notes:
+  - Uses `esc()` passed from the caller to escape HTML strings.
+  - Attempts to normalize dimension labels via `prettyDimension` and uses
+    a small local mapping to ensure accents and friendly labels.
+*/
+
+export async function showReportesView($view, $title, esc) {
   $title.textContent = "";
   $view.innerHTML = `
-    <header class="dashboard-header card">
-        <div class="header-text">
-            <h1>Generador de Reportes</h1>
-            <p>Reportes de cada objetivo estrategico</p>
-        </div>
-    </header>
-
+  <header class="dashboard-header card">
+  <div class="header-text"> 
+  <h1>Generador de reportes</h1>
+  <p> Seleccione un objetivo estratégico para generar su reporte consolidado con datos en tiempo real. </p>
+  </div>
+  </header>
     <section class="card card--full">
       <header class="card__header">
-        <h2 style="margin:0;">Selecciona un Objetivo</h2>
+        <h2 style="margin:0;">Selecciona una Dimension</h2>
       </header>
       <div class="card__body">
-         <p style="margin-bottom:1rem; color:#666;">Elige un objetivo estratégico para generar su reporte consolidado con datos en tiempo real.</p>
          <div id="reportSelectorContainer">
            <div class="loading-spinner">Cargando objetivos...</div>
          </div>
       </div>
     </section>
   `;
-  if (!document.getElementById('report-styles')) {
-    const style = document.createElement("style");
-    style.id = 'report-styles';
-    style.textContent = `
-    
-      .report-header-text {padding: 0.5rem;}
-      .report-header-text h2 {margin:0;font-size: 1.25rem; font-weight: 600; color: #334155; text-align: justify; line-height: 1.5;}
-      .report-header-text .report-dimension-tag {font-size: 0.85rem;color: var(--primary);font-weight: 700;text-transform: uppercase;margin-bottom: 0.2rem;display: block;}
-      .report-header-text .report-period {font-size: 0.95rem;color: #777;display: block;margin-top: 4px;}
-      .report-stats-grid { display: grid;grid-template-columns: 0.8fr 1fr 1fr 1fr 1.2fr;gap: 1rem;align-items: stretch;}
-      .info-box {background: #f9fafb; border-radius: 12px; padding: 1.25rem 1rem; text-align: center; min-width: 110px; border: 1px solid #eef2f7;display: flex;flex-direction: column;justify-content: center;lign-items: center;}
-      .info-box strong {  display: block; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;margin-bottom: 8px;}
-      .info-box span { font-size: 1.5rem; font-weight: 700; color: var(--primary); display: block;line-height: 1.2;}
-      .ring-large {position:relative; width:100px; height:100px; flex-shrink:0;}
-      .ring-text {position:absolute;top:50%; left:50%;transform:translate(-50%,-50%); font-weight:700;  font-size:1.5rem;color:var(--primary);}  
-      .report-section { margin-top:2.5rem; }
-      .report-section h4 { border-bottom:2px solid var(--primary); padding-bottom:.5rem; margin-bottom:1rem; color:var(--primary); font-size:1.1rem; }
-      .progress-row { display:flex; align-items:center; gap:1rem; margin-top:.8rem; font-size:0.95rem; }
-      .progress-bar { flex:1; background:#e5e7eb; border-radius:6px; overflow:hidden; height:12px; }
-      .progress-bar .fill { background:var(--primary); height:100%; border-radius:6px; transition:width 1s ease-in-out; }
-      .percent { min-width:60px; text-align:right; font-weight:700; color:var(--primary); }
-      .plan-table { width:100%; border-collapse:collapse; margin-top:1rem; }
-      .plan-table th, .plan-table td { padding:10px 12px; border-bottom:1px solid #eee; font-size:.9rem; vertical-align:middle; }
-      .plan-table th { background:var(--bg-color, #f3f4f6); text-align:left; font-weight:700; color:var(--text-color); }
-      .money { text-align: right; font-variant-numeric: tabular-nums; }
-      .btn-gen { width:100%; text-align:left; padding:10px 15px; background:#fff; border:1px solid #eee; border-radius:8px; transition:all .2s; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
-      .btn-gen:hover { border-color:var(--primary); background:var(--bg-color); color:var(--primary); }
-      .dim-group { margin-bottom:1.5rem; }
-      .dim-title { font-weight:700; color:var(--muted-color); margin-bottom:0.5rem; text-transform:uppercase; font-size:0.85rem; }
-      .evidence-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
-      .evidence-thumb { height:240px; width:320px; object-fit:cover; border-radius:6px; border:1px solid #eee; display:block; }
-      .evidence-file { padding:8px;border:1px solid #eee;border-radius:6px;max-width:200px;background:#fff; }
-      .evidence-item { display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; }
-      .evidence-desc { flex:1; color:var(--text-color); line-height:1.4; }
-      .evidence-meta { font-size:0.85rem; color:var(--muted-color); margin-bottom:6px; }
-      .meta-title-row {font-size: 1.05rem; font-weight: 600; color: #334155; text-align: justify; line-height: 1.5; margin-bottom: 0.5rem;}
-      .indicator-summary {font-size: 0.9rem; font-style: italic; color: #475569; margin-top: 1rem; margin-bottom: 0.5rem;padding-left: 1.25rem;}
-      .indicator-summary p {margin: 0;}
-      .indicator-list {padding-left: 1.25rem; margin-top: 0.75rem; border-left: 2px solid #eee; margin-left: 10px;}
-      .indicator-list .progress-row span {flex: 1; padding-right: 10px;color: #333;font-size: 0.9rem; line-height: 1.4;}
-      .report-summary-text {font-size: 0.95rem;color: #334155; line-height: 1.6;text-align: justify; margin-bottom: 1.5rem;}
-    `;
-    document.head.appendChild(style);
+
+  if (!document.getElementById('report-styles-link')) {
+    const link = document.createElement('link');
+    link.id = 'report-styles-link';
+    link.rel = 'stylesheet';
+    link.href = 'css/report_styles.css';
+    document.head.appendChild(link);
   }
+
+  // Mapeo local de nombres de dimensión (asegura acentos y etiquetas legibles)
+  const DIMENSION_TITLES = {
+    'LIDERAZGO': 'Liderazgo',
+    'GESTION_PEDAGOGICA': 'Gestión Pedagógica',
+    'CONVIVENCIA_ESCOLAR': 'Convivencia Escolar',
+    'GESTION_RECURSOS': 'Gestión de Recursos'
+  };
+
+  function prettyDimension(dim) {
+    if (!dim && dim !== 0) return '';
+    const key = String(dim).toUpperCase().replace(/\s+/g, '_');
+    if (DIMENSION_TITLES[key]) return DIMENSION_TITLES[key];
+    try {
+      if (typeof window !== 'undefined' && typeof window.tituloDimension === 'function') return window.tituloDimension(dim);
+      if (typeof tituloDimension === 'function') return tituloDimension(dim);
+    } catch (e) {
+      // ignore
+    }
+    // Fallback: replace underscores and title-case
+    return String(dim).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // Colores solicitados para los títulos de dimensión
+  const DIMENSION_COLORS = {
+    'Liderazgo': '#eab308',
+    'Gestión Pedagógica': '#6d28d9',
+    'Convivencia Escolar': '#3b82f6',
+    'Gestión de Recursos': '#f97316',
+    'Resultados': '#0f172a'
+  };
+
+  function dimensionColor(dim) {
+    const label = prettyDimension(dim);
+    return DIMENSION_COLORS[label] || 'inherit';
+  }
+
   try {
       const fetcher = window.apiFetch || apiFetch; 
       const objs = await fetcher('/objectives?limit=500').then(r => r.json());
@@ -93,9 +105,16 @@ export async function showReportesView($view, $title, esc) {
           byDim[o.dimension].push(o);
       });
 
+      function dimensionLabel(d) {
+        return prettyDimension(d);
+      }
+
       let html = '';
-      for (const [dim, list] of Object.entries(byDim)) {
-          html += `<div class="dim-group"><div class="dim-title">${tituloDimension(dim)}</div><div style="display:flex;flex-direction:column;gap:8px;">`;
+        for (const [dim, list] of Object.entries(byDim)) {
+          const displayLabel = dimensionLabel(dim);
+          const titleColor = dimensionColor(dim);
+          const titleStyle = titleColor ? ` style="color:${titleColor};"` : '';
+          html += `<div class="dim-group" aria-expanded="false"><div class="dim-header" data-toggle-dim tabindex="0"><div class="dim-left"><span class="dim-title"${titleStyle}>${esc(displayLabel)}</span><span class="dim-count">${list.length}</span></div><span class="dim-arrow">▶</span></div><div class="dim-content">`;
           list.forEach(o => {
                html += `
                <button class="btn-gen" data-generate-id="${o.id}">
@@ -107,12 +126,45 @@ export async function showReportesView($view, $title, esc) {
       }
       container.innerHTML = html;
 
-      container.addEventListener('click', (e) => {
+        // set initial ARIA state on headers
+        container.querySelectorAll('.dim-group').forEach(g => g.setAttribute('aria-expanded', 'false'));
+
+        // click handler
+        container.addEventListener('click', (e) => {
+          const header = e.target.closest('[data-toggle-dim]');
+          if (header) {
+              const group = header.closest('.dim-group');
+              if (!group) return;
+            group.classList.toggle('open');
+            const isOpen = group.classList.contains('open');
+            group.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            // update header aria
+            const h = group.querySelector('[data-toggle-dim]');
+            if (h) h.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+              return;
+          }
+
           const btn = e.target.closest('[data-generate-id]');
           if (btn) {
               generateReport(btn.dataset.generateId);
           }
       });
+
+        // keyboard support: toggle on Enter or Space when header focused
+        container.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            const header = e.target.closest('[data-toggle-dim]');
+            if (!header) return;
+            e.preventDefault();
+            const group = header.closest('.dim-group');
+            if (!group) return;
+            group.classList.toggle('open');
+            const isOpen = group.classList.contains('open');
+            group.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            const h = group.querySelector('[data-toggle-dim]');
+            if (h) h.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          }
+        });
   }
 
   async function generateReport(objId) {
@@ -128,10 +180,11 @@ export async function showReportesView($view, $title, esc) {
           const fetcher = window.apiFetch || apiFetch;
           const fmtMoney = window.formatoMoneda || formatoMoneda;
 
-          const [obj, goals, allPlans] = await Promise.all([
+          const [obj, goals, allPlans, currentUser] = await Promise.all([
               fetcher(`/objectives/${objId}`).then(r => r.json()),
               fetcher(`/objectives/${objId}/goals?limit=500`).then(r => r.json()),
-              fetcher(`/plans?limit=500`).then(r => r.json())
+              fetcher(`/plans?limit=500`).then(r => r.json()),
+              fetcher(`/auth/me`).then(r => r.json()) 
           ]);
 
           let totalIndicadores = 0;
@@ -169,7 +222,7 @@ export async function showReportesView($view, $title, esc) {
          }
       }
 
-          renderFinalReport(obj, goals, relevantPlans, objProgress, totalIndicadores, totalRecursos, fmtMoney);
+          renderFinalReport(obj, goals, relevantPlans, objProgress, totalIndicadores, totalRecursos, fmtMoney, currentUser);
 
       } catch (e) {
           console.error(e);
@@ -177,17 +230,10 @@ export async function showReportesView($view, $title, esc) {
       }
   }
 
-  function renderFinalReport(obj, goals, plans, objProgress, totalIndicadores, totalRecursos, fmtMoney) {
-      $title.textContent = "";
+  function renderFinalReport(obj, goals, plans, objProgress, totalIndicadores, totalRecursos, fmtMoney, user) {
+      $title.textContent = "Reporte Consolidado";
       
       $view.innerHTML = `
-        <header class="dashboard-header card">
-          <div class="header-text">
-              <h1>Reporte Consolidado</h1>
-              <p>Informe completo del objetivo estratégico escogido</p>
-          </div>
-        </header>
-
         <section class="card card--full reportes-container">
           <header class="card__header" style="display:flex;justify-content:space-between;align-items:center; flex-wrap:wrap; gap:10px;">
             <button id="btnVolverRep" class="btn btn--ghost">← Volver al selector</button>
@@ -196,7 +242,7 @@ export async function showReportesView($view, $title, esc) {
             </div>
           </header>
 
-          <div class="card__body" id="reportContent" style="padding: 2rem;">
+          <div class="card__body" id="reportContent" style="padding: 2rem; position: relative;">
 
             <div id="pdf-logo-header" style="position: absolute; top: 1.5rem; right: 2rem; display: none;">
               <img src="Imagenes/LOGOS/logo_reporte.png" alt="Logo Colegio" style="width: 200px; height: auto; opacity: 0.8;" />
@@ -212,15 +258,15 @@ export async function showReportesView($view, $title, esc) {
               display: none; 
             "></div>
 
-            <div class="report-header-text">
-              <span class="report-dimension-tag">${tituloDimension(obj.dimension)}</span>
+              <div class="report-header-text">
+              <span class="report-dimension-tag" style="color:${dimensionColor(obj.dimension)}">${esc(prettyDimension(obj.dimension))}</span>
               <h2>${esc(obj.name)}</h2>
               <span class="report-period">Periodo: ${obj.start_year} – ${obj.end_year}</span>
               
               <div class="report-summary" style="margin-top: 1.5rem; text-align: justify; font-size: 0.95rem; color: #334155; line-height: 1.6;">
                 <p>
                   Este reporte presenta un resumen consolidado del objetivo estratégico <strong>"${esc(obj.name)}"</strong>, 
-                  perteneciente a la dimensión de <strong>${esc(tituloDimension(obj.dimension))}</strong>. 
+                  perteneciente a la dimensión de <strong>${esc(prettyDimension(obj.dimension))}</strong>. 
                   El objetivo presenta un avance general actual del <strong>${objProgress.toFixed(1)}%</strong>.
                 </p>
                 <p>
@@ -423,6 +469,23 @@ export async function showReportesView($view, $title, esc) {
                     `;
               }).join('') : '<p>No hay evidencias relacionadas con las acciones.</p>' }
             </div>
+            </div> 
+            <div id="pdf-signature" style="
+                        display: none;               
+                        margin-top: 4rem;             
+                        padding-top: 1.5rem;         
+                        border-top: 1px solid #e2e8f0; 
+                        font-size: 0.8rem;
+                        color: #555;
+                        text-align: center;            
+                      ">
+                <p style="margin:0; padding:0; line-height: 1.4;">
+                  <strong>Documento Generado por:</strong><br>
+                  ${esc(user.name)}<br>
+                  RUT: ${esc(user.rut)}<br>
+                  Fecha: ${new Date().toLocaleString('es-CL')}
+                </p>
+              </div>
           </div>
         </section>
       `;
@@ -445,7 +508,8 @@ export async function showReportesView($view, $title, esc) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.lineWidth = 8;
-      ctx.strokeStyle = "#e5e7eb";
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      ctx.strokeStyle = isDark ? "#334155" : "#e5e7eb";
       ctx.beginPath();
       ctx.arc(50, 50, radius, 0, 2 * Math.PI);
       ctx.stroke();
@@ -468,7 +532,7 @@ function showPdfOverlay() {
     left: 0; 
     width: 100%; 
     height: 100%; 
-    background: #ffffff; /* ¡CAMBIO! De 0.9 a sólido */
+    background: #ffffff; 
     z-index: 10000; 
     display: flex; 
     justify-content: center; 
@@ -505,6 +569,7 @@ function hidePdfOverlay() {
           const element = document.getElementById("reportContent");
           const logo = document.getElementById("pdf-logo-header"); 
           const line = document.getElementById("pdf-header-line");
+          const signature = document.getElementById("pdf-signature");
           const reportHeaderText = element.querySelector(".report-header-text");
 
           const opt = {
@@ -526,12 +591,14 @@ function hidePdfOverlay() {
           setTimeout(() => {
             if (logo) logo.style.display = 'block'; 
             if (line) line.style.display = 'block';
+            if (signature) signature.style.display = 'block';
             if (reportHeaderText) reportHeaderText.style.paddingTop = '6.6rem'; 
 
             window.html2pdf().set(opt).from(element).save().then(() => {
                 btn.disabled = false;
                 if (logo) logo.style.display = 'none'; 
                 if (line) line.style.display = 'none';
+                if (signature) signature.style.display = 'none';
                 if (reportHeaderText) reportHeaderText.style.paddingTop = '0';
                 hidePdfOverlay(); 
             }).catch((err) => {
@@ -539,6 +606,7 @@ function hidePdfOverlay() {
                 btn.disabled = false;
                 if (logo) logo.style.display = 'none';
                 if (line) line.style.display = 'none';
+                if (signature) signature.style.display = 'none';
                 if (reportHeaderText) reportHeaderText.style.paddingTop = '0';
                 hidePdfOverlay();
                 alert("Hubo un error al generar el PDF.");

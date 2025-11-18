@@ -1,3 +1,18 @@
+/*
+  app_dashboard.js
+
+  Purpose: Main dashboard utilities and view helpers for the frontend.
+  - Navigation helpers (hash-based routing helpers such as navigateHash)
+  - Caching utilities for objectives mapping
+  - UI helpers (confirmation dialog, formatting helpers)
+  - Dimension ordering and color maps used by charts and lists
+  - Chart rendering helpers (donut, horizontal bars) and related legend rendering
+
+  Notes:
+  - This file exposes some functions to `window` for reuse by other modules.
+  - Chart rendering uses Chart.js when available; animation options are controlled here.
+*/
+
 function navigateHash(newHash) {
   if (location.hash === newHash) {
     router();
@@ -120,6 +135,28 @@ function ordenarDatosPorDimension(datos) {
 }
 
 // --- Small UI utilities used by the dashboard -------------------------------
+// ---- FUNCION PARA MODO OSCURO DE LOS GRAFICOS -----
+function getChartTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  
+  if (isDark) {
+    return {
+      text: '#cbd5e1',      // Gris claro para textos (ejes)
+      grid: '#334155',      // Azul grisáceo oscuro para líneas de cuadrícula
+      tooltipBg: '#1e293b', // Fondo oscuro para el tooltip
+      tooltipText: '#fff'   // Texto blanco para tooltip
+    };
+  } else {
+    // Colores originales (Modo Claro)
+    return {
+      text: '#64748b',
+      grid: '#f1f5f9',
+      tooltipBg: '#fff',
+      tooltipText: '#0f172a'
+    };
+  }
+}
+
 /** Formatea CLP sin decimales. */
 function formatoMoneda(n) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n);
@@ -149,6 +186,7 @@ function pintarDonutDimension(containerId, items) {
   if (!canvas || !ul) return;
 
   // colores en hexadecimal para que chart.js los tome, de lo contrario no funcionara
+  const theme = getChartTheme();
   const colorMap = {
       'Liderazgo': '#eab308',        
       'Gestión Pedagógica': '#6d28d9',
@@ -156,7 +194,7 @@ function pintarDonutDimension(containerId, items) {
       'Gestión de Recursos': '#f97316',
       'Resultados': '#0f172a'
   };
-  const grayColor = getComputedStyle(document.documentElement).getPropertyValue('--ring-bg').trim() || '#e9efff';
+  const grayColor = getComputedStyle(document.documentElement).getPropertyValue('--ring-bg').trim() || '#334155';
 
   let activeIndex = null; 
 
@@ -170,7 +208,7 @@ function pintarDonutDimension(containerId, items) {
       const chartData = [];
       const chartColors = [];
       
-      // muestra el donut original (todos)
+      // muestra el donut original (todos)--
       if (activeIndex === null) {
           let totalFaltante = 0;
           items.forEach(item => {
@@ -228,10 +266,10 @@ function pintarDonutDimension(containerId, items) {
           plugins: {
             legend: { display: false }, 
             tooltip: {
-              backgroundColor: '#fff',
-              titleColor: '#0f172a',
-              bodyColor: '#64748b',
-              borderColor: '#e2e8f0',
+              backgroundColor: theme.tooltipBg,
+              titleColor: theme.tooltipText,
+              bodyColor: theme.text,
+              borderColor: theme.grid, 
               borderWidth: 1,
               padding: 10,
               displayColors: true,
@@ -312,7 +350,7 @@ function pintarDonutDimension(containerId, items) {
           const spanPct = document.createElement("span");
           spanPct.style.marginLeft = "auto";
           spanPct.style.fontWeight = "700";
-          spanPct.style.color = "var(--text)";
+          spanPct.style.color = "inhe";
           spanPct.textContent = `(${val.toFixed(1)}%)`;
 
           li.appendChild(spanColor);
@@ -356,6 +394,7 @@ function pintarBarrasHorizontales(containerId, items, formatValue) {
       'Gestión de Recursos': '#f97316',
       'Resultados': '#0f172a'
   };
+  const theme = getChartTheme();
 
   const labels = items.map(it => it.etiqueta);
   const dataValues = items.map(it => it.valor);
@@ -395,10 +434,10 @@ function pintarBarrasHorizontales(containerId, items, formatValue) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#fff',
-          titleColor: '#0f172a',
-          bodyColor: '#64748b',
-          borderColor: '#e2e8f0',
+          backgroundColor: theme.tooltipBg,
+          titleColor: theme.tooltipText,
+          bodyColor: theme.text,
+          borderColor: theme.grid,
           borderWidth: 1,
           callbacks: {
             label: function(context) {
@@ -411,12 +450,12 @@ function pintarBarrasHorizontales(containerId, items, formatValue) {
         x: {
           beginAtZero: true, // IMPORTANTE: para que la animación parta desde 0
           grid: {
-            color: '#f1f5f9', 
+            color: theme.grid, 
             borderDash: [5, 5]
           },
           ticks: {
             font: { size: 11 },
-            color: '#64748b',
+            color: theme.text,
             callback: function(value) {
               if (value >= 1000000) {
                 return '$' + (value / 1000000).toFixed(0) + ' M'; 
@@ -431,7 +470,7 @@ function pintarBarrasHorizontales(containerId, items, formatValue) {
           grid: { display: false },
           ticks: {
             font: { weight: '600', size: 12 },
-            color: '#334155'
+            color: theme.text
           }
         }
       }
@@ -467,6 +506,7 @@ function pintarBarrasVerticales(containerId, items, formatValue) {
       'Gestión de Recursos': '#f97316',
       'Resultados': '#0f172a'
   };
+  const theme = getChartTheme();
 
   const labels = items.map(it => it.etiqueta);
   const dataValues = items.map(it => it.valor);
@@ -504,10 +544,10 @@ function pintarBarrasVerticales(containerId, items, formatValue) {
       plugins: {
         legend: { display: false }, // Ocultamos leyenda
         tooltip: {
-          backgroundColor: '#fff',
-          titleColor: '#0f172a',
-          bodyColor: '#64748b',
-          borderColor: '#e2e8f0',
+          backgroundColor: theme.tooltipBg,
+          titleColor: theme.tooltipText,
+          bodyColor: theme.text, 
+          borderColor: theme.grid,
           borderWidth: 1,
           callbacks: {
             // Tooltip que muestra el valor usando tu formateador
@@ -523,7 +563,7 @@ function pintarBarrasVerticales(containerId, items, formatValue) {
           grid: { display: false }, // Limpiamos líneas verticales para que se vea más moderno
           ticks: {
             font: { size: 11, weight: '600' }, // Nombres de dimensiones un poco más negrita
-            color: '#64748b',
+            color: theme.text,
             autoSkip: false, // Asegura que se muestren todas las etiquetas aunque sean largas
             maxRotation: 0,  // Evita que los textos se inclinen (si caben)
             minRotation: 0
@@ -532,12 +572,12 @@ function pintarBarrasVerticales(containerId, items, formatValue) {
         y: {
           beginAtZero: true,
           grid: {
-            color: '#f1f5f9',
+            color: theme.grid,
             borderDash: [5, 5]
           },
           ticks: {
             font: { size: 11 },
-            color: '#94a3b8',
+            color: theme.text,
             precision: 0 // evitamos usar decimales
           }
         }
@@ -1685,7 +1725,7 @@ async function showObjectiveResources(dimensionValue, objetivo) {
         <p>Contenido del filtro para recursos…</p>
       </div>
 
-      <div class="card__body table-wrap">
+      <div class="table-wrap">
         <div class="scroll-btns">
           <button class="btn-swipe" data-dir="-1">◀</button>
           <button class="btn-swipe" data-dir="1">▶</button>
@@ -2357,6 +2397,53 @@ document.getElementById('btnAgregarFila')?.addEventListener('click', async () =>
   });
 }
 
+// funcion modo oscuro 
+document.addEventListener('DOMContentLoaded', () => {
+    const toggleSwitch = document.querySelector('#hide-checkbox');
+    const themeLabel = document.querySelector('#theme-label'); // Seleccionamos el texto
+    const currentTheme = localStorage.getItem('theme');
+
+    function updateLabel(isDay) {
+        if (themeLabel) {
+            themeLabel.textContent = isDay ? "Modo Día" : "Modo Noche";
+        }
+    }
+
+    if (currentTheme) {
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        if (currentTheme === 'dark') {
+            if (toggleSwitch) toggleSwitch.checked = false;
+            updateLabel(false);
+        } else {
+            if (toggleSwitch) toggleSwitch.checked = true;
+            updateLabel(true);
+        }
+    } else {
+        if (toggleSwitch) toggleSwitch.checked = true;
+        updateLabel(true);
+    }
+
+    function switchTheme(e) {
+        if (e.target.checked) {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+            updateLabel(true);
+        } 
+        else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+            updateLabel(false);
+        }
+
+        if (location.hash === '#/dashboard' || location.hash === '') {
+            showDashboard(); 
+        }
+    }
+    
+    if(toggleSwitch){
+        toggleSwitch.addEventListener('change', switchTheme);
+    }
+});
 
 // --- Router -----------------------------------------------------------------
 let __routing = false;
