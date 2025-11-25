@@ -1,94 +1,184 @@
-const form = document.querySelector('form');
+const wrapper = document.querySelector('.wrapper');
+const registerLink = document.querySelector('.register-link');
+const roleButtons = document.querySelectorAll('.role-btn');
+const loginForm = document.getElementById('loginForm');
 const $rut = document.getElementById('rut');
 const $password = document.getElementById('password');
-const $submit   = document.getElementById('submit');
-const $msg      = document.getElementById('loginMsg');
-const $toggle   = document.getElementById('ShowPassword')
-const $statusBar = document.getElementById('progressBar');
-const $statusIcon = document.getElementById('statusIcon');
+const $submit = document.getElementById('submit');
 
+// Elementos de estado
+const $statusContainer = document.getElementById('loginStatus');
+const $statusText = document.querySelector('.status-text');
 
-function updateStatus(state, iconText = '') {
-    $statusBar.className = 'progress-bar';
-    $statusIcon.className = 'status-icon';
-    $statusIcon.textContent = iconText;
-    $statusIcon.style.opacity = '0';
-    $statusBar.style.width = '0%';
+// NUEVO: Referencia al título de saludo
+const $welcomeTitle = document.querySelector('.info-text.login h2'); 
 
-    switch (state) {
-        case 'loading':
-            $statusBar.classList.add('progress-bar--loading');
-            break;
-        case 'success':
-            $statusBar.classList.add('progress-bar--success');
-            $statusIcon.classList.add('status-icon--success');
-            setTimeout(() => { $statusIcon.style.opacity = '1'; }, 700); 
-            break;
-        case 'error':
-            $statusBar.classList.add('progress-bar--error');
-            $statusIcon.classList.add('status-icon--error');
+// Variables globales
+let targetRole = ''; 
+let statusInterval;
 
-            const container = document.querySelector('.contenedor');
-            container.classList.add('shake-animation');
-            setTimeout(() =>{ container.classList.remove('shake-animation')}, 450);
-            setTimeout(() => { $statusIcon.style.opacity = '1'; }, 700); 
-            break;
-    }
-}
+// MAPA DE ROLES
+const roleMapping = {
+    'Administrador': 'editor',
+    'Usuario': 'viewer',
+    'Editor': 'progress_editor'
+};
 
-if ($toggle) {
-    $toggle.addEventListener('change', () => {
-        const type = $password.getAttribute('type') === 'password' ? 'text' : 'password';
-        $password.setAttribute('type', type);
-    });
-}
+// --- 1. SELECCIÓN DE ROL ---
+registerLink.onclick = (e) => {
+    e.preventDefault();
+    wrapper.classList.add('active');
+    // Opcional: Resetear el título al volver
+    setTimeout(() => { $welcomeTitle.innerText = "¡Hola de nuevo!"; }, 500);
+};
 
-$rut.addEventListener('input', () => updateStatus('initial'));
-$password.addEventListener('input', () => updateStatus('initial'));
+roleButtons.forEach(btn => {
+    btn.onclick = () => {
+        const btnText = btn.innerText.trim(); // Obtenemos "Administrador", "Usuario", etc.
+        targetRole = roleMapping[btnText]; 
+        
+        // --- CAMBIO AQUÍ: ACTUALIZAR EL SALUDO ---
+        if ($welcomeTitle) {
+            $welcomeTitle.innerText = `¡Hola ${btnText}!`;
+        }
+        // -----------------------------------------
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (!$rut.value.trim() || !$password.value) {
-    showMsg('Ingresa usuario y contraseña.', 'msg--error');
-    return;
-  }
-
-  $submit.disabled = true;
-  updateStatus('loading');
-
-  try {
-    const formData = new URLSearchParams();
-    formData.append('username', $rut.value.trim());
-    formData.append('password', $password.value);
-
-    const res = await fetch('http://127.0.0.1:8000/auth/login', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: formData.toString()
-    });
-
-    if (!res.ok) {
-      updateStatus('error', 'X')
-
-      return;
-    }
-
-    const data = await res.json();
-    localStorage.setItem('token', data.access_token);
-    updateStatus('success', '✓');
-    setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
-  } catch (err) {
-      updateStatus('error', 'X');
-  } finally {
-      setTimeout(() => { $submit.disabled = false; }, 1200);
-  }
+        wrapper.classList.remove('active');
+        
+        // Resetear estado visual
+        resetUI();
+    };
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const container = document.querySelector('.contenedor');
+// Función para limpiar la interfaz
+function resetUI() {
+    $statusContainer.style.display = 'none';
+    $statusContainer.classList.remove('status-error');
+    $submit.style.display = 'block';
+    $submit.disabled = false;
+    $rut.value = '';
+    $password.value = '';
+}
+
+// --- 2. DECODIFICADOR DE TOKEN ---
+function getRoleFromToken(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const payload = JSON.parse(jsonPayload);
+        return Array.isArray(payload.roles) ? payload.roles[0] : (payload.role || payload.scope);
+    } catch (e) {
+        return null;
+    }
+}
+
+// --- 3. MANEJO DE ERRORES VISUALES ---
+function showError(message) {
+    clearInterval(statusInterval);
+
+    $statusContainer.innerHTML = `<p class="status-text" style="font-weight:bold;">${message}</p>`;
+    $statusContainer.classList.add('status-error');
     
-    // Esperamos lo que dura la animación (800ms) y quitamos la clase
+    wrapper.classList.add('shake-animation');
+    setTimeout(() => wrapper.classList.remove('shake-animation'), 500);
+
     setTimeout(() => {
-        container.classList.remove('entrada-suave');
-    }, 1000); // Le damos 1000ms (1s) para estar seguros
+        $statusContainer.style.display = 'none';
+        $statusContainer.classList.remove('status-error');
+        $statusContainer.innerHTML = ''; 
+        
+        $submit.style.display = 'block';
+        $submit.disabled = false;
+    }, 2500);
+}
+
+// --- 4. SECUENCIA DE CARGA ---
+function playLoadingSequence() {
+    $submit.style.display = 'none';
+    $statusContainer.style.display = 'flex';
+    $statusContainer.classList.remove('status-error');
+    
+    $statusContainer.innerHTML = `
+        <div class="spinner"></div>
+        <p id="statusText" class="status-text">Conectando...</p>
+    `;
+    
+    const textEl = document.getElementById('statusText');
+    const messages = [
+        "Verificando Usuario...",      
+        "Verificando Contraseña...",    
+        "Validando Rol...",             
+        "Cargando Datos..."             
+    ];
+    let i = 0;
+
+    if(textEl) textEl.textContent = messages[0];
+
+    statusInterval = setInterval(() => {
+        i++;
+        if (i < messages.length) {
+            if(textEl) textEl.textContent = messages[i];
+        }
+    }, 800); 
+}
+
+// --- 5. PROCESO DE LOGIN ---
+loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!$rut.value.trim() || !$password.value) {
+        $submit.style.display = 'none';
+        showError("Ingresa tus datos");
+        return;
+    }
+
+    $submit.disabled = true;
+    playLoadingSequence(); 
+
+    try {
+        const formData = new URLSearchParams();
+        formData.append('username', $rut.value.trim());
+        formData.append('password', $password.value);
+
+        // Simulamos la espera de 3 segundos
+        const waitPromise = new Promise(resolve => setTimeout(resolve, 3000));
+        
+        const fetchPromise = fetch('http://127.0.0.1:8000/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+
+        const [_, res] = await Promise.all([waitPromise, fetchPromise]);
+
+        clearInterval(statusInterval); 
+
+        if (!res.ok) {
+            throw new Error("Credenciales incorrectas");
+        }
+
+        const data = await res.json();
+        const token = data.access_token;
+        const realRole = getRoleFromToken(token);
+
+        // Validación de Rol
+        if (realRole !== targetRole) {
+            throw new Error("Estás ingresando al perfil equivocado");
+        }
+
+        localStorage.setItem('token', token);
+        
+        const textEl = document.getElementById('statusText');
+        if(textEl) textEl.textContent = "¡Éxito! Redirigiendo...";
+        
+        setTimeout(() => {
+            window.location.href = 'dashboard.html';
+        }, 1000); 
+
+    } catch (err) {
+        showError(err.message);
+    }
 });

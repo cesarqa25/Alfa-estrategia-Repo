@@ -1,46 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plataforma Colegio Arzobispado</title>
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="./css/styles.css">
     <link rel="icon" href="./Imagenes/logo-chico.png">
 </head>
 <body>
-    <div class="contenedor entrada-suave">
-        <form action="submit">
+
+    <div class="wrapper active">
+        <span class="bg-animate"></span>
+        <span class="bg-animate2"></span>
+
+        <div class="form-box login">
+            <h2 class="animation" style="--i:0; --j:21;">Iniciar Sesión</h2>
+            <form id="loginForm">
+                <div class="input-box animation" style="--i:1; --j:22;">
+                    <input type="text" required id="rut">
+                    <label>RUT</label>
+                    <i class='bx bxs-user'></i>
+                </div>
+                <div class="input-box animation" style="--i:2; --j:23;">
+                    <input type="password" required id="password">
+                    <label>Contraseña</label>
+                    <i class='bx bxs-lock-alt'></i>
+                </div>
+                
+                <div id="loginStatus" class="status-container" style="display: none;">
+                    <div class="spinner"></div>
+                    <p id="statusText" class="status-text">Verificando Usuario...</p>
+                </div>
+
+                <button type="submit" class="btn animation" id="submit" style="--i:4; --j:25;">Ingresar</button>
+                
+                <div class="logreg-link animation" style="--i:5; --j:26;">
+                    <p>¿Quieres cambiar de rol? <a href="#" class="register-link">¡Cambia!</a></p>
+                </div>
+            </form>
+        </div>
+
+        <div class="info-text login">
+            <h2 class="animation" style="--i:0; --j:20;">¡Hola de nuevo!</h2>
+            <p class="animation" style="--i:1; --j:21;">Ingresa tus credenciales para acceder.</p>
+        </div>
+
+        <div class="form-box register">
+            <h2 class="animation" style="--i:17; --j:0;">Selecciona tu Rol</h2>
             
-            <div class="top">
-                <img src="https://colegiosarzobispado.cl/wp-content/uploads/2025/07/logo-texto.png" alt="Logo Colegio Arzobispado" title="Logo Colegio Arzobispado">
-                <h1>Iniciar Sesión</h1>
+            <div class="role-buttons-container">
+                <button class="btn role-btn animation" style="--i:18; --j:1;">Administrador</button>
+                <button class="btn role-btn animation" style="--i:19; --j:2;">Usuario</button>
+                <button class="btn role-btn animation" style="--i:20; --j:3;">Editor</button>
             </div>
 
-            <div class="input-box">
-                <input type="text" placeholder="RUT" id="rut" required>
-                <img class="icon" src="../Frontend/Imagenes/ICONOS/extra/user.png"> 
+            <div class="logreg-link animation" style="--i:21; --j:4;">
+                <p>Selecciona tu perfil para continuar.</p>
             </div>
+        </div>
 
-            <div class="input-box2">
-                <input type="password" placeholder="Contraseña" required id="password">
-                <img class="icon" src="../Frontend/Imagenes/ICONOS/extra/lock.png">  
-            </div>
-
-            <div class="button-check">
-                <input type="checkbox" id="ShowPassword">
-                <label for="ShowPassword" class="label-check">Mostrar Contraseña</label>
-            </div>
-            
-            <div id="loginStatus" class="login-status" role="status" aria-live="polite">
-                <div id="progressBar" class="progress-bar"></div>
-                <div id="statusIcon" class="status-icon"></div>
-            </div>
-        
-            <button type="submit" id="submit">Ingresar</button>
-
-        </form>
-
+        <div class="info-text register">
+            <h2 class="animation" style="--i:17; --j:0;">¡Bienvenido!</h2>
+            <p class="animation" style="--i:18; --j:1;">Plataforma de Gestión Colegio Arzobispado.</p>
+        </div>
     </div>
+
     <script src="./js/Login.js"></script>
 </body>
 </html>

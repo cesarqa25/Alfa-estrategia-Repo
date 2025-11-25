@@ -1,6 +1,6 @@
 :root {
-  --primary: #1e5ac8;
-  --primary-600: #1a4ead;
+  --primary: #122f5e;
+  --primary-600: #1c488f;
   --bg: #f4f7ff;
   --surface: #ffffff;
   --text: #0f172a;
@@ -34,7 +34,7 @@ body {
   height: auto;
 }
 
-/*container de arriba*/
+/*container de arriba
 .container{
   background: linear-gradient(180deg, var(--primary), var(--primary-600));
   grid-column: 2 / 3;
@@ -72,6 +72,7 @@ body {
   from{transform: translateX(0);}
   to{transform: translateX(-50%);}
 }
+*/
 
 /*Barra lateral*/
 .sidebar {
@@ -185,7 +186,7 @@ content: '▾';
 /*main - lo que se ve dentro*/
 .main { 
   grid-column: 2 / 3;
-  grid-row: 2 / 4;
+  grid-row: 1 / 4;
   padding: 0 20px; 
   position: relative;
   overflow-x: hidden;
@@ -213,8 +214,8 @@ content: '▾';
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1; /* Ambas columnas ocupan el mismo ancho (50%) */
-  min-width: 0; /* Evita desbordamientos en flexbox */
+  flex: 1; 
+  min-width: 0; 
 }
 
 .card {
